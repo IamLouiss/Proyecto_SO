@@ -1,0 +1,9 @@
+/bin/
+/obj/
+/logs/
+*.o
+*.out
+*.exe
+.vscode/
+.DS_Store
+*~
