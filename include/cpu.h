@@ -42,7 +42,22 @@ typedef struct {
 extern CPU_t cpu;
 
 // --- PROTOTIPOS DE FUNCIONES ---
+
+// Inicializa el cpu con valores por defecto
 void inicializar_cpu();
-void dump_cpu(); 
+
+// Debugger del cpu
+void dump_cpu();
+
+// Ejecuta una instruccion (Fetch -> Decode -> Execute).
+// Retorna 1 si salio bien y 0 si hubo error o Halt
+int paso_cpu();
+
+// Bucle principal que llama a paso_cpu hasta terminar
+void ejecutar_cpu();
+
+// Funcion auxiliar para obtener el valor real del operando segun el modo
+// (Maneja la logica de Direccionamiento Directo, Inmediato, etc.)
+int obtener_operando(int direccion, int modo);
 
 #endif // CPU_H
