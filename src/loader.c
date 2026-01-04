@@ -27,9 +27,9 @@ int cargar_programa(const char *nombre_archivo) {
             continue;
         }
 
-        // Intentamos leer un número hexadecimal de 8 dígitos al inicio de la línea
-        // %x lee hexadecimales
-        if (sscanf(linea, "%x", &instruccion) == 1) {
+        // Intentamos leer un número decimal de 8 dígitos al inicio de la línea
+        // %d lee decimales
+        if (sscanf(linea, "%d", &instruccion) == 1) {
             // Verificar que no desbordemos la memoria
             if (direccion_actual >= TAMANO_MEMORIA) {
                 printf("[ERROR] El programa es demasiado grande para la memoria.\n");
@@ -39,7 +39,7 @@ int cargar_programa(const char *nombre_archivo) {
             // Guardamos en la RAM de nuestra CPU
             cpu.memoria[direccion_actual] = instruccion;
             
-            printf("[MEM] Dir %04d: %08X cargado.\n", direccion_actual, instruccion);
+            printf("[MEM] Dir %04d: %08d cargado.\n", direccion_actual, instruccion);
             
             direccion_actual++;
         }
