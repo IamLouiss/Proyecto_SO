@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include "../include/cpu.h" 
 #include "../include/constantes.h"
+#define MAX_VALOR 99999999
+#define MIN_VALOR -99999999
 
 // 1. Instanciamos la variable global real (La máquina)
 CPU_t cpu;
@@ -122,26 +124,99 @@ int paso_cpu() {
     opcode = (instruccion / 1000000);     // Los primeros 2 dígitos
     modo = (instruccion / 100000) % 10;   // El 3er dígito
     operando = (instruccion % 100000);    // Los últimos 5 dígitos
-
+    
     // Debugging visual
     printf("[CPU] PC:%04d | IR:%08d -> OP:%02d M:%d VAL:%05d\n", 
-           cpu.MAR, instruccion, opcode, modo, operando);
-
+        cpu.MAR, instruccion, opcode, modo, operando);
+        
     // --- 3. EXECUTE (Ejecución) ---
     switch (opcode) {
+
+        // --- ARITMÉTICA CON DETECCIÓN DE DESBORDAMIENTO (CC=3) ---
+        case OP_SUM: // 00 - Sumar
+        {
+            // Lógica: AC = AC + Valor
+            int val = obtener_valor_operando(modo, operando);
+            long long resultado_temp = (long long)cpu.AC + val; // Usamos long long para ver si se pasa
+
+            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+                cpu.psw.codigo_condicion = 3;
+            } else {
+                cpu.AC = (int)resultado_temp;
+                // Actualizamos CC normal (Opcional, algunos CPUs lo hacen)
+                if (cpu.AC == 0) cpu.psw.codigo_condicion = 0;
+                else if (cpu.AC < 0) cpu.psw.codigo_condicion = 1;
+                else cpu.psw.codigo_condicion = 2;
+            }
+            break;
+        }    
+
+        case OP_RES: // 01 - Restar
+        {
+            // Lógica: AC = AC - Valor
+            int val = obtener_valor_operando(modo, operando);
+            long long resultado_temp = (long long)cpu.AC - val;
+
+            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+                cpu.psw.codigo_condicion = 3;
+            } else {
+                cpu.AC = (int)resultado_temp;
+                // Actualizar CC normal
+                if (cpu.AC == 0) cpu.psw.codigo_condicion = 0;
+                else if (cpu.AC < 0) cpu.psw.codigo_condicion = 1;
+                else cpu.psw.codigo_condicion = 2;
+            }
+            break;
+        }
+            
+        case OP_MULT: // 02 - Multiplicar
+        {
+            // Lógica: AC = AC * Valor
+            int val = obtener_valor_operando(modo, operando);
+            long long resultado_temp = (long long)cpu.AC * val;
+
+            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+                cpu.psw.codigo_condicion = 3;
+            } else {
+                cpu.AC = (int)resultado_temp;
+                if (cpu.AC == 0) cpu.psw.codigo_condicion = 0;
+                else if (cpu.AC < 0) cpu.psw.codigo_condicion = 1;
+                else cpu.psw.codigo_condicion = 2;
+            }
+            break;
+        }
+
+        case OP_DIVI: // 03 - Dividir
+        {
+            // Lógica: AC = AC / Valor
+            int val = obtener_valor_operando(modo, operando);
+            if (val != 0) {
+                cpu.AC /= val;
+                if (cpu.AC == 0) cpu.psw.codigo_condicion = 0;
+                else if (cpu.AC < 0) cpu.psw.codigo_condicion = 1;
+                else cpu.psw.codigo_condicion = 2;
+            } else {
+                cpu.psw.codigo_condicion = 3; // Podemos usar el 3 también para Error Matemático
+                printf("[ERROR] Division por cero en PC=%d\n", cpu.psw.pc);
+                return 0;
+            }
+            break;
+        }
+            
         case OP_LOAD: // 04 - Cargar en AC
+        {
             // Lógica: AC = Valor
             cpu.AC = obtener_valor_operando(modo, operando);
             break;
+        }
             
         case OP_STR: // 05 - Guardar AC en Memoria
-             // Lógica: Memoria[Operando] = AC
+        {
+            // Lógica: Memoria[Operando] = AC
             int dir_destino = -1;
-
             if (modo == DIR_DIRECTO) {
                 dir_destino = operando + cpu.RB;
-            } 
-            else if (modo == DIR_INDEXADO) {
+            } else if (modo == DIR_INDEXADO) {
                 dir_destino = operando + cpu.RB + cpu.RX;
             }
 
@@ -151,20 +226,96 @@ int paso_cpu() {
                 printf("      -> Guardado %d en Mem[%d]\n", cpu.AC, dir_destino);
             }
             break;
+        }
 
-        case OP_SUM: // 00 - Sumar a AC
-            // Lógica: AC = AC + Valor
-            cpu.AC += obtener_valor_operando(modo, operando);
+        case OP_LOADRX: // 06 - Cargar en RX
+        {
+            // Lógica: RX = Valor
+            cpu.RX = obtener_valor_operando(modo, operando);
             break;
+        }
+
+        case OP_STRRX: // 07 - Guardar RX en Memoria
+        {
+            // Igual que STR, pero la fuente es RX
+            int dir_destino = -1;
+            if (modo == DIR_DIRECTO) {
+                dir_destino = operando + cpu.RB;
+            } else if (modo == DIR_INDEXADO) {
+                dir_destino = operando + cpu.RB + cpu.RX;
+            }
+
+            if (dir_destino != -1 && validar_direccion(dir_destino)) {
+                cpu.memoria[dir_destino] = cpu.RX;
+                printf("      -> Guardado RX (%d) en Mem[%d]\n", cpu.RX, dir_destino);
+                }
+            break;
+        }
+
+        case OP_COMP: // 08 - Comparar
+        {
+            int val = obtener_valor_operando(modo, operando);
+            if (cpu.AC == val) {
+                cpu.psw.codigo_condicion = 0; // Iguales
+            } else if (cpu.AC < val) {
+                cpu.psw.codigo_condicion = 1; // Menor
+            } else {
+                cpu.psw.codigo_condicion = 2; // Mayor
+            }
+            break;
+        }
+
+        // --- SALTOS (JUMPS) ---
+        case OP_JMPE: // 09 - Jump Equal (Si CC == 0)
+        {
+            if (cpu.psw.codigo_condicion == 0) {
+                cpu.psw.pc = cpu.RB + operando;
+            }
+            break;
+        }
+
+        case OP_JMPNE: // 10 - Jump Not Equal (Si CC != 0)
+        {
+            if (cpu.psw.codigo_condicion != 0) {
+                cpu.psw.pc = cpu.RB + operando;
+            }
+            break;
+        }
+
+        case OP_JMPLT: // 11 - Jump Less Than (Si CC == 1)
+        {
+            if (cpu.psw.codigo_condicion == 1) {
+                cpu.psw.pc = cpu.RB + operando;
+            }
+            break;
+        }
+            
+        case OP_JMPLGT: // 12 - Jump Greater Than (Si CC == 2)
+        {
+            if (cpu.psw.codigo_condicion == 2) {
+                cpu.psw.pc = cpu.RB + operando;
+            }
+            break;
+        }
+
+        case OP_J: // 27 - Salto Incondicional (Salta siempre)
+        {
+            cpu.psw.pc = cpu.RB + operando;
+            break;
+        }
         
         case OP_SVC: // 13 - System Call (Terminar por ahora)
+        {
             printf("[CPU] SVC detectado (Fin del programa o llamada al sistema)\n");
             return 0; // Detenemos la CPU
             break;
+        }
 
         default:
+        {
             printf("[ERROR] Opcode %d no implementado aun.\n", opcode);
             return 0;
+        }
     }
     
     return 1; // Continuar ejecutando
@@ -176,6 +327,7 @@ void ejecutar_cpu() {
         if (!paso_cpu()) {
             cpu.ejecutando = 0; // Detener si paso_cpu retorna 0
         }
+        dump_cpu();
         // Aquí podríamos poner un sleep() si fuera visualización lenta
     }
     printf("--- EJECUCION FINALIZADA ---\n");
