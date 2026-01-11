@@ -18,14 +18,18 @@ void inicializar_cpu() {
     cpu.psw.interrupciones = 0;      // Deshabilitadas al inicio
     cpu.psw.codigo_condicion = 0;
     
+    
     // El PC debe apuntar a donde arrancará el programa.
     // Por ahora, lo ponemos en el inicio de usuario.
     cpu.psw.pc = INICIO_USUARIO;     
     
+    //********************************************************************** *
+    
     // Inicializar registros de protección (Todo el espacio de usuario)
     cpu.RB = INICIO_USUARIO;
     cpu.RL = TAMANO_MEMORIA - 1;
-
+    cpu.SP = cpu.RL - cpu.RB;
+    
     // Bandera para el bucle principal
     cpu.ejecutando = 1;
 
@@ -40,6 +44,8 @@ void dump_cpu() {
     printf("PSW: CC=%d Mode=%d Int=%d\n", 
            cpu.psw.codigo_condicion, cpu.psw.modo_operacion, cpu.psw.interrupciones);
     printf("Stack: SP=%d RX=%d\n", cpu.SP, cpu.RX);
+    // Agregamos RB (Base) y RL (Limite) para ver la "cancha" de memoria
+    printf("Stack: SP=%d | RB=%d | RLLLLL=%d\n", cpu.SP, cpu.RB, cpu.RL);
     printf("==================\n");
 }
 
@@ -303,13 +309,135 @@ int paso_cpu() {
             cpu.psw.pc = cpu.RB + operando;
             break;
         }
+     
+
+        // --- SISTEMA Y CONTROL (13-18) ---
         
-        case OP_SVC: // 13 - System Call (Terminar por ahora)
-        {
-            printf("[CPU] SVC detectado (Fin del programa o llamada al sistema)\n");
-            return 0; // Detenemos la CPU
+        case OP_SVC: // Código 13: System Call (Llamada al Sistema)                                   FFIIIIIXXXX TTTHHHIIISSS!!!!!
+            // Se usa para solicitar servicios al Kernel (como E/S o terminar).
+            // En esta Fase 1, si AC=0 asumimos que se pide terminar la simulación.
+            printf("      -> [SVC] Llamada al sistema detectada. Codigo en AC: %d\n", cpu.AC);
+            if (cpu.AC == 0) {
+                printf("      -> [INFO] SVC 0: Solicitud de fin de programa.\n");
+                cpu.ejecutando = 0; // Detiene el bucle principal
+            }
             break;
+
+        case OP_RETRN: // Código 14: Return (Retorno de Subrutina)                                   FFIIIIIXXXX TTTHHHIIISSS!!!!!
+            // Recupera el valor del PC que estaba guardado en el tope de la Pila.
+            // Esto permite volver al lugar donde se llamó a la función.
+            if (cpu.SP < TAMANO_MEMORIA) {
+                cpu.psw.pc = cpu.memoria[cpu.SP]; // Leemos la dirección de retorno
+                cpu.SP++; // "Desapilamos" (incrementamos SP)
+                printf("      -> [RETRN] Retornando a la direccion %d\n", cpu.psw.pc);
+            } else {
+                printf("      -> [ERROR] Stack Underflow al intentar RETRN.\n");
+                cpu.ejecutando = 0;
+            }
+            break;
+
+        case OP_HAB: // Código 15: Habilitar Interrupciones
+            cpu.psw.interrupciones = 1;
+            printf("      -> [HAB] Interrupciones HABILITADAS.\n");
+            break;
+
+        case OP_DHAB: // Código 16: Deshabilitar Interrupciones
+            cpu.psw.interrupciones = 0;
+            printf("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
+            break;
+
+        case OP_TTI: // Código 17: Timer Interrupt Time
+            // Configura el temporizador del sistema (simulado).
+            printf("      -> [TTI] Intervalo del reloj configurado a %d ciclos.\n", operando);
+            break;
+
+        case OP_CHMOD: // Código 18: Change Mode
+            // Cambia el modo de ejecución: 0 = Usuario, 1 = Kernel.
+            cpu.psw.modo_operacion = operando;
+            printf("      -> [CHMOD] Modo cambiado a: %s\n", (operando ? "KERNEL" : "USUARIO"));
+            break;
+
+        // --- PROTECCIÓN DE MEMORIA (19-22) ---
+        // Estos registros delimitan qué parte de la memoria puede usar el programa actual.
+
+        case OP_LOADRB: // 19: Cargar Registro Base
+            cpu.AC = cpu.RB; 
+            printf("      -> [LOADRB] AC cargado con RB (%d)\n", cpu.RB);
+            break;
+            
+        case OP_STRRB:  // 20: Guardar en Registro Base
+            cpu.RB = cpu.AC; 
+            printf("      -> [STRRB] RB actualizado con AC (%d)\n", cpu.RB);
+            break;
+
+        case OP_LOADRL: // 21: Cargar Registro Límite
+            cpu.AC = cpu.RL; 
+            printf("      -> [LOADRL] AC cargado con RL (%d)\n", cpu.RL);
+            break;
+
+        case OP_STRRL:  // 22: Guardar en Registro Límite
+            cpu.RL = cpu.AC; 
+            printf("      -> [STRRL] RL actualizado con AC (%d)\n", cpu.RL);
+            break;
+
+        // --- MANEJO DE PILA (STACK) (23-26) ---
+        
+        case OP_LOADSP: // 23: Cargar Stack Pointer a AC
+            cpu.AC = cpu.SP;
+            printf("      -> [LOADSP] AC cargado con SP (%d)\n", cpu.AC);
+            break;
+
+        case OP_STRSP:  // 24: Actualizar Stack Pointer desde AC
+            cpu.SP = cpu.AC;
+             printf("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.RL);
+            break;
+
+        case OP_PSH: // 25: PUSH
+        
+        // 1. Calculamos la dirección física REAL
+        int dir_fisica = cpu.RB + cpu.SP;
+        
+        // 2. Verificamos seguridad
+        //    (SP >= 0) asegura que no bajemos más allá del piso 0 relativo
+        if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
+
+            cpu.memoria[dir_fisica] = cpu.AC; 
+            printf("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
+                cpu.AC, dir_fisica, cpu.SP);
+                // 3. RESTAMOS Para pasar de 1700 (imaginario) a 1699 (real)
+                cpu.SP--;
+        } else {
+            printf("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
+            cpu.ejecutando = 0;
         }
+        break;
+
+        case OP_POP: // 26: POP (Desapilar)
+
+            // 1. VALIDAR SI HAY DATOS (Stack Underflow)
+            // Tu tope inicial calculado es (cpu.RL - cpu.RB) = 1699.
+            // Si SP = 1699, significa que no hemos hecho ningún PUSH todavía.
+            int tope = TAMANO_MEMORIA - INICIO_USUARIO -1;
+            if (cpu.SP < tope) { 
+                
+                // 2. SUMAR PRIMERO (Pre-incremento)
+                // Pasamos de la posición vacía (ej. 1698) a la llena (1699)
+                cpu.SP++; 
+                
+                // 3. CALCULAR DIRECCIÓN FÍSICA
+                int dir_fisica_pop = cpu.RB + cpu.SP;
+
+                // 4. LEER EL DATO
+                cpu.AC = cpu.memoria[dir_fisica_pop];
+                
+                printf("      -> [POP] Recuperado %d de MemFisica[%d] (SP Logico: %d)\n", 
+                cpu.AC, dir_fisica_pop, cpu.SP);
+                       
+            } else {
+                printf("      -> [ERROR] Stack Underflow (La pila esta vacia)\n");
+                cpu.ejecutando = 0;
+            }
+            break;
 
         default:
         {

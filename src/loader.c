@@ -47,9 +47,6 @@ int cargar_programa(const char *nombre_archivo) {
 
     fclose(archivo);
     printf("[LOADER] Carga completada. %d instrucciones cargadas.\n", direccion_actual - INICIO_USUARIO);
-    
-    // Actualizamos el RL (Registro Límite) al tamaño real del programa cargado
-    cpu.RL = direccion_actual - 1;
-    
+
     return 1; // Éxito
 }
