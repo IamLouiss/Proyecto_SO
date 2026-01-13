@@ -45,7 +45,7 @@ void dump_cpu() {
            cpu.psw.codigo_condicion, cpu.psw.modo_operacion, cpu.psw.interrupciones);
     printf("Stack: SP=%d RX=%d\n", cpu.SP, cpu.RX);
     // Agregamos RB (Base) y RL (Limite) para ver la "cancha" de memoria
-    printf("Stack: SP=%d | RB=%d | RLLLLL=%d\n", cpu.SP, cpu.RB, cpu.RL);
+    printf("Stack: SP=%d | RB=%d | RL=%d\n", cpu.SP, cpu.RB, cpu.RL);
     printf("==================\n");
 }
 
@@ -313,7 +313,7 @@ int paso_cpu() {
 
         // --- SISTEMA Y CONTROL (13-18) ---
         
-        case OP_SVC: // Código 13: System Call (Llamada al Sistema)                                   FFIIIIIXXXX TTTHHHIIISSS!!!!!
+        case OP_SVC: // Código 13: System Call (Llamada al Sistema)
             // Se usa para solicitar servicios al Kernel (como E/S o terminar).
             // En esta Fase 1, si AC=0 asumimos que se pide terminar la simulación.
             printf("      -> [SVC] Llamada al sistema detectada. Codigo en AC: %d\n", cpu.AC);
@@ -323,13 +323,13 @@ int paso_cpu() {
             }
             break;
 
-        case OP_RETRN: // Código 14: Return (Retorno de Subrutina)                                   FFIIIIIXXXX TTTHHHIIISSS!!!!!
+        case OP_RETRN: // Código 14: Return (Retorno de Subrutina)
             // Recupera el valor del PC que estaba guardado en el tope de la Pila.
             // Esto permite volver al lugar donde se llamó a la función.
-            if (cpu.SP < TAMANO_MEMORIA) {
-                cpu.psw.pc = cpu.memoria[cpu.SP]; // Leemos la dirección de retorno
-                cpu.SP++; // "Desapilamos" (incrementamos SP)
-                printf("      -> [RETRN] Retornando a la direccion %d\n", cpu.psw.pc);
+            if (cpu.SP < (TAMANO_MEMORIA - INICIO_USUARIO - 1)) {
+                cpu.SP++; // Pasamos de la posicion vacia a la llena
+                cpu.psw.pc = cpu.memoria[cpu.SP + cpu.RB]; // Leemos la dirección de retorno
+                printf("      -> [RETRN] Retornando a la direccion %d (Stack[%d])\n", cpu.psw.pc, cpu.SP);
             } else {
                 printf("      -> [ERROR] Stack Underflow al intentar RETRN.\n");
                 cpu.ejecutando = 0;
@@ -346,15 +346,30 @@ int paso_cpu() {
             printf("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
             break;
 
-        case OP_TTI: // Código 17: Timer Interrupt Time
+        case OP_TTI: // Código 17: Timer Interrupt Time ----------------------------------------- REVISAR ------------------------------
             // Configura el temporizador del sistema (simulado).
+            // cpu.timer_setting = operando;
             printf("      -> [TTI] Intervalo del reloj configurado a %d ciclos.\n", operando);
             break;
 
-        case OP_CHMOD: // Código 18: Change Mode
-            // Cambia el modo de ejecución: 0 = Usuario, 1 = Kernel.
-            cpu.psw.modo_operacion = operando;
-            printf("      -> [CHMOD] Modo cambiado a: %s\n", (operando ? "KERNEL" : "USUARIO"));
+        case OP_CHMOD: // Código 18
+            // 1. VALIDACIÓN DE SEGURIDAD:
+            // Solo el Modo Kernel (1) tiene permiso de usar esta instrucción.
+            // Si un usuario (0) intenta usarla, es una violación de privilegios.
+            if (cpu.psw.modo_operacion == 0) {
+                printf("      -> [ERROR] Violacion de Privilegios: CHMOD intentado en Modo Usuario.\n");
+                // Opcional: cpu.ejecutando = 0; // Matar el proceso rebelde
+                break;
+            }
+
+            // 2. VALIDACIÓN DE DATOS:
+            // Solo aceptamos 0 o 1. Si viene un 5, lo ignoramos o damos error.
+            if (operando == 0 || operando == 1) {
+                cpu.psw.modo_operacion = operando;
+                printf("      -> [CHMOD] Transicion de modo a: %s\n", (operando ? "KERNEL" : "USUARIO"));
+            } else {
+                printf("      -> [ERROR] CHMOD invalido. El modo %d no existe.\n", operando);
+            }
             break;
 
         // --- PROTECCIÓN DE MEMORIA (19-22) ---
@@ -389,35 +404,36 @@ int paso_cpu() {
 
         case OP_STRSP:  // 24: Actualizar Stack Pointer desde AC
             cpu.SP = cpu.AC;
-             printf("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.RL);
+             printf("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.SP);
             break;
 
         case OP_PSH: // 25: PUSH
-        
-        // 1. Calculamos la dirección física REAL
-        int dir_fisica = cpu.RB + cpu.SP;
-        
-        // 2. Verificamos seguridad
-        //    (SP >= 0) asegura que no bajemos más allá del piso 0 relativo
-        if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
+        {
+            // 1. Calculamos la dirección física REAL
+            int dir_fisica = cpu.RB + cpu.SP;
+            
+            // 2. Verificamos seguridad
+            //    (SP >= 0) asegura que no bajemos más allá del piso 0 relativo
+            if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
 
-            cpu.memoria[dir_fisica] = cpu.AC; 
-            printf("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
-                cpu.AC, dir_fisica, cpu.SP);
+                cpu.memoria[dir_fisica] = cpu.AC; 
+                printf("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
+                    cpu.AC, dir_fisica, cpu.SP);
                 // 3. RESTAMOS Para pasar de 1700 (imaginario) a 1699 (real)
                 cpu.SP--;
-        } else {
-            printf("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
-            cpu.ejecutando = 0;
+            } else {
+                printf("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
+                cpu.ejecutando = 0;
+            }
+            break;
         }
-        break;
 
         case OP_POP: // 26: POP (Desapilar)
-
+        {
             // 1. VALIDAR SI HAY DATOS (Stack Underflow)
             // Tu tope inicial calculado es (cpu.RL - cpu.RB) = 1699.
             // Si SP = 1699, significa que no hemos hecho ningún PUSH todavía.
-            int tope = TAMANO_MEMORIA - INICIO_USUARIO -1;
+            int tope = TAMANO_MEMORIA - INICIO_USUARIO - 1;
             if (cpu.SP < tope) { 
                 
                 // 2. SUMAR PRIMERO (Pre-incremento)
@@ -438,12 +454,11 @@ int paso_cpu() {
                 cpu.ejecutando = 0;
             }
             break;
+        }
 
         default:
-        {
             printf("[ERROR] Opcode %d no implementado aun.\n", opcode);
             return 0;
-        }
     }
     
     return 1; // Continuar ejecutando
