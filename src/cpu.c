@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "../include/cpu.h" 
 #include "../include/constantes.h"
+#include "../include/logger.h"
 #define MAX_VALOR 99999999
 #define MIN_VALOR -99999999
 
@@ -33,20 +34,20 @@ void inicializar_cpu() {
     // Bandera para el bucle principal
     cpu.ejecutando = 1;
 
-    printf("[INFO] CPU Inicializada. Modo Kernel. Memoria limpia (0-1999).\n");
+    logger_log("[INFO] CPU Inicializada. Modo Kernel. Memoria limpia (0-1999).\n");
 }
 
 void dump_cpu() {
     // Esta función nos servirá para ver qué pasa dentro (Debugger)
-    printf("\n=== ESTADO CPU ===\n");
-    printf("PC: %04d | IR: %08d | AC: %08d\n", cpu.psw.pc, cpu.IR, cpu.AC);
-    printf("MAR: %04d | MDR: %08d\n", cpu.MAR, cpu.MDR);
-    printf("PSW: CC=%d Mode=%d Int=%d\n", 
+    logger_log("\n=== ESTADO CPU ===\n");
+    logger_log("PC: %04d | IR: %08d | AC: %08d\n", cpu.psw.pc, cpu.IR, cpu.AC);
+    logger_log("MAR: %04d | MDR: %08d\n", cpu.MAR, cpu.MDR);
+    logger_log("PSW: CC=%d Mode=%d Int=%d\n", 
            cpu.psw.codigo_condicion, cpu.psw.modo_operacion, cpu.psw.interrupciones);
-    printf("Stack: SP=%d RX=%d\n", cpu.SP, cpu.RX);
+    logger_log("Stack: SP=%d RX=%d\n", cpu.SP, cpu.RX);
     // Agregamos RB (Base) y RL (Limite) para ver la "cancha" de memoria
-    printf("Stack: SP=%d | RB=%d | RL=%d\n", cpu.SP, cpu.RB, cpu.RL);
-    printf("==================\n");
+    logger_log("Stack: SP=%d | RB=%d | RL=%d\n", cpu.SP, cpu.RB, cpu.RL);
+    logger_log("==================\n");
 }
 
 // Valida si una dirección física es legal para el proceso actual
@@ -59,7 +60,7 @@ int validar_direccion(int dir_fisica) {
 
     // En Modo Usuario (0), verificamos los límites
     if (dir_fisica < cpu.RB || dir_fisica > cpu.RL) {
-        printf("[INT] Violacion de segmento: Dir %d fuera de rango (%d-%d)\n", 
+        logger_log("[INT] Violacion de segmento: Dir %d fuera de rango (%d-%d)\n", 
                dir_fisica, cpu.RB, cpu.RL);
         // Aquí deberíamos disparar la interrupción INT_DIR_INVALIDA
         return 0;
@@ -104,7 +105,6 @@ int obtener_valor_operando(int modo, int operando) {
 
 int paso_cpu() {
     int instruccion, opcode, modo, operando;
-    int val_operando; // Valor final para operar
 
     // --- 1. FETCH (Búsqueda) ---
     // a. MAR <- PC
@@ -132,7 +132,7 @@ int paso_cpu() {
     operando = (instruccion % 100000);    // Los últimos 5 dígitos
     
     // Debugging visual
-    printf("[CPU] PC:%04d | IR:%08d -> OP:%02d M:%d VAL:%05d\n", 
+    logger_log("[CPU] PC:%04d | IR:%08d -> OP:%02d M:%d VAL:%05d\n", 
         cpu.MAR, instruccion, opcode, modo, operando);
         
     // --- 3. EXECUTE (Ejecución) ---
@@ -203,7 +203,7 @@ int paso_cpu() {
                 else cpu.psw.codigo_condicion = 2;
             } else {
                 cpu.psw.codigo_condicion = 3; // Podemos usar el 3 también para Error Matemático
-                printf("[ERROR] Division por cero en PC=%d\n", cpu.psw.pc);
+                logger_log("[ERROR] Division por cero en PC=%d\n", cpu.psw.pc);
                 return 0;
             }
             break;
@@ -229,7 +229,7 @@ int paso_cpu() {
             // Solo escribimos si la dirección es válida (y no es -1)
             if (dir_destino != -1 && validar_direccion(dir_destino)) {
                 cpu.memoria[dir_destino] = cpu.AC;
-                printf("      -> Guardado %d en Mem[%d]\n", cpu.AC, dir_destino);
+                logger_log("      -> Guardado %d en Mem[%d]\n", cpu.AC, dir_destino);
             }
             break;
         }
@@ -253,7 +253,7 @@ int paso_cpu() {
 
             if (dir_destino != -1 && validar_direccion(dir_destino)) {
                 cpu.memoria[dir_destino] = cpu.RX;
-                printf("      -> Guardado RX (%d) en Mem[%d]\n", cpu.RX, dir_destino);
+                logger_log("      -> Guardado RX (%d) en Mem[%d]\n", cpu.RX, dir_destino);
                 }
             break;
         }
@@ -316,9 +316,9 @@ int paso_cpu() {
         case OP_SVC: // Código 13: System Call (Llamada al Sistema)
             // Se usa para solicitar servicios al Kernel (como E/S o terminar).
             // En esta Fase 1, si AC=0 asumimos que se pide terminar la simulación.
-            printf("      -> [SVC] Llamada al sistema detectada. Codigo en AC: %d\n", cpu.AC);
+            logger_log("      -> [SVC] Llamada al sistema detectada. Codigo en AC: %d\n", cpu.AC);
             if (cpu.AC == 0) {
-                printf("      -> [INFO] SVC 0: Solicitud de fin de programa.\n");
+                logger_log("      -> [INFO] SVC 0: Solicitud de fin de programa.\n");
                 cpu.ejecutando = 0; // Detiene el bucle principal
             }
             break;
@@ -329,27 +329,27 @@ int paso_cpu() {
             if (cpu.SP < (TAMANO_MEMORIA - INICIO_USUARIO - 1)) {
                 cpu.SP++; // Pasamos de la posicion vacia a la llena
                 cpu.psw.pc = cpu.memoria[cpu.SP + cpu.RB]; // Leemos la dirección de retorno
-                printf("      -> [RETRN] Retornando a la direccion %d (Stack[%d])\n", cpu.psw.pc, cpu.SP);
+                logger_log("      -> [RETRN] Retornando a la direccion %d (Stack[%d])\n", cpu.psw.pc, cpu.SP);
             } else {
-                printf("      -> [ERROR] Stack Underflow al intentar RETRN.\n");
+                logger_log("      -> [ERROR] Stack Underflow al intentar RETRN.\n");
                 cpu.ejecutando = 0;
             }
             break;
 
         case OP_HAB: // Código 15: Habilitar Interrupciones
             cpu.psw.interrupciones = 1;
-            printf("      -> [HAB] Interrupciones HABILITADAS.\n");
+            logger_log("      -> [HAB] Interrupciones HABILITADAS.\n");
             break;
 
         case OP_DHAB: // Código 16: Deshabilitar Interrupciones
             cpu.psw.interrupciones = 0;
-            printf("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
+            logger_log("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
             break;
 
         case OP_TTI: // Código 17: Timer Interrupt Time ----------------------------------------- REVISAR ------------------------------
             // Configura el temporizador del sistema (simulado).
             // cpu.timer_setting = operando;
-            printf("      -> [TTI] Intervalo del reloj configurado a %d ciclos.\n", operando);
+            logger_log("      -> [TTI] Intervalo del reloj configurado a %d ciclos.\n", operando);
             break;
 
         case OP_CHMOD: // Código 18
@@ -357,7 +357,7 @@ int paso_cpu() {
             // Solo el Modo Kernel (1) tiene permiso de usar esta instrucción.
             // Si un usuario (0) intenta usarla, es una violación de privilegios.
             if (cpu.psw.modo_operacion == 0) {
-                printf("      -> [ERROR] Violacion de Privilegios: CHMOD intentado en Modo Usuario.\n");
+                logger_log("      -> [ERROR] Violacion de Privilegios: CHMOD intentado en Modo Usuario.\n");
                 // Opcional: cpu.ejecutando = 0; // Matar el proceso rebelde
                 break;
             }
@@ -366,9 +366,9 @@ int paso_cpu() {
             // Solo aceptamos 0 o 1. Si viene un 5, lo ignoramos o damos error.
             if (operando == 0 || operando == 1) {
                 cpu.psw.modo_operacion = operando;
-                printf("      -> [CHMOD] Transicion de modo a: %s\n", (operando ? "KERNEL" : "USUARIO"));
+                logger_log("      -> [CHMOD] Transicion de modo a: %s\n", (operando ? "KERNEL" : "USUARIO"));
             } else {
-                printf("      -> [ERROR] CHMOD invalido. El modo %d no existe.\n", operando);
+                logger_log("      -> [ERROR] CHMOD invalido. El modo %d no existe.\n", operando);
             }
             break;
 
@@ -377,34 +377,34 @@ int paso_cpu() {
 
         case OP_LOADRB: // 19: Cargar Registro Base
             cpu.AC = cpu.RB; 
-            printf("      -> [LOADRB] AC cargado con RB (%d)\n", cpu.RB);
+            logger_log("      -> [LOADRB] AC cargado con RB (%d)\n", cpu.RB);
             break;
             
         case OP_STRRB:  // 20: Guardar en Registro Base
             cpu.RB = cpu.AC; 
-            printf("      -> [STRRB] RB actualizado con AC (%d)\n", cpu.RB);
+            logger_log("      -> [STRRB] RB actualizado con AC (%d)\n", cpu.RB);
             break;
 
         case OP_LOADRL: // 21: Cargar Registro Límite
             cpu.AC = cpu.RL; 
-            printf("      -> [LOADRL] AC cargado con RL (%d)\n", cpu.RL);
+            logger_log("      -> [LOADRL] AC cargado con RL (%d)\n", cpu.RL);
             break;
 
         case OP_STRRL:  // 22: Guardar en Registro Límite
             cpu.RL = cpu.AC; 
-            printf("      -> [STRRL] RL actualizado con AC (%d)\n", cpu.RL);
+            logger_log("      -> [STRRL] RL actualizado con AC (%d)\n", cpu.RL);
             break;
 
         // --- MANEJO DE PILA (STACK) (23-26) ---
         
         case OP_LOADSP: // 23: Cargar Stack Pointer a AC
             cpu.AC = cpu.SP;
-            printf("      -> [LOADSP] AC cargado con SP (%d)\n", cpu.AC);
+            logger_log("      -> [LOADSP] AC cargado con SP (%d)\n", cpu.AC);
             break;
 
         case OP_STRSP:  // 24: Actualizar Stack Pointer desde AC
             cpu.SP = cpu.AC;
-             printf("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.SP);
+             logger_log("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.SP);
             break;
 
         case OP_PSH: // 25: PUSH
@@ -417,12 +417,12 @@ int paso_cpu() {
             if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
 
                 cpu.memoria[dir_fisica] = cpu.AC; 
-                printf("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
+                logger_log("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
                     cpu.AC, dir_fisica, cpu.SP);
                 // 3. RESTAMOS Para pasar de 1700 (imaginario) a 1699 (real)
                 cpu.SP--;
             } else {
-                printf("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
+                logger_log("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
                 cpu.ejecutando = 0;
             }
             break;
@@ -446,18 +446,18 @@ int paso_cpu() {
                 // 4. LEER EL DATO
                 cpu.AC = cpu.memoria[dir_fisica_pop];
                 
-                printf("      -> [POP] Recuperado %d de MemFisica[%d] (SP Logico: %d)\n", 
+                logger_log("      -> [POP] Recuperado %d de MemFisica[%d] (SP Logico: %d)\n", 
                 cpu.AC, dir_fisica_pop, cpu.SP);
                        
             } else {
-                printf("      -> [ERROR] Stack Underflow (La pila esta vacia)\n");
+                logger_log("      -> [ERROR] Stack Underflow (La pila esta vacia)\n");
                 cpu.ejecutando = 0;
             }
             break;
         }
 
         default:
-            printf("[ERROR] Opcode %d no implementado aun.\n", opcode);
+            logger_log("[ERROR] Opcode %d no implementado aun.\n", opcode);
             return 0;
     }
     
@@ -465,7 +465,7 @@ int paso_cpu() {
 }
 
 void ejecutar_cpu() {
-    printf("--- INICIANDO EJECUCION ---\n");
+    logger_log("--- INICIANDO EJECUCION ---\n");
     while (cpu.ejecutando) {
         if (!paso_cpu()) {
             cpu.ejecutando = 0; // Detener si paso_cpu retorna 0
@@ -473,5 +473,5 @@ void ejecutar_cpu() {
         dump_cpu();
         // Aquí podríamos poner un sleep() si fuera visualización lenta
     }
-    printf("--- EJECUCION FINALIZADA ---\n");
+    logger_log("--- EJECUCION FINALIZADA ---\n");
 }
