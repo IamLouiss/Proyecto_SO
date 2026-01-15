@@ -2,6 +2,7 @@
 #define CPU_H
 
 #include "constantes.h"
+#include <pthread.h>
 
 // Estructura para la Palabra de Estado del Programa (PSW)
 typedef struct {
@@ -26,6 +27,14 @@ typedef struct {
     // Registros de Pila
     int RX;   // Registro Índice/Auxiliar
     int SP;   // Stack Pointer (Tope de la pila)
+
+    // Hilos y timer
+    int timer_periodo;
+    int interrupcion_pendiente;
+    int codigo_interrupcion;
+
+    // Control de hilos
+    pthread_mutex_t mutex;
     
     // Palabra de Estado
     PSW_t psw;
@@ -56,8 +65,6 @@ int paso_cpu();
 // Bucle principal que llama a paso_cpu hasta terminar
 void ejecutar_cpu();
 
-// Funcion auxiliar para obtener el valor real del operando segun el modo
-// (Maneja la logica de Direccionamiento Directo, Inmediato, etc.)
-int obtener_operando(int direccion, int modo);
+void *hilo_timer(void *arg);
 
 #endif // CPU_H

@@ -3,8 +3,7 @@ _start 1
 .NombreProg TestTotal
 // --- 1. Pruebas de Sistema (15, 16, 17, 18) ---
 15000000 // 00: HAB      -> Activa interrupciones
-16000000 // 01: DHAB     -> Desactiva interrupciones
-17000050 // 02: TTI 50   -> Configura reloj (Solo print por ahora)
+17000002 // 02: TTI 2   -> Configura reloj (Solo print por ahora)
 // --- 2. Prueba de Seguridad CHMOD (18) ---
 // Intentamos pasar a Kernel (1). Como estamos en Usuario (0), 
 // la CPU debería GRITAR un error de "Violación de Privilegios" y no cambiar.

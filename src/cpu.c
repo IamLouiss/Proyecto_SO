@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "../include/cpu.h" 
 #include "../include/constantes.h"
 #include "../include/logger.h"
@@ -346,10 +347,14 @@ int paso_cpu() {
             logger_log("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
             break;
 
-        case OP_TTI: // Código 17: Timer Interrupt Time ----------------------------------------- REVISAR ------------------------------
-            // Configura el temporizador del sistema (simulado).
-            // cpu.timer_setting = operando;
-            logger_log("      -> [TTI] Intervalo del reloj configurado a %d ciclos.\n", operando);
+        case OP_TTI: // 17 - Configurar Timer
+            // Ahora sí guardamos el valor para que el hilo lo lea
+            pthread_mutex_lock(&cpu.mutex); // Protegemos el cambio
+            cpu.timer_periodo = operando;
+            pthread_mutex_unlock(&cpu.mutex);
+            
+            logger_log("      -> [TTI] Timer configurado a %d ciclos (aprox %d ms).\n", 
+                       operando, operando * 10);
             break;
 
         case OP_CHMOD: // Código 18
@@ -464,14 +469,72 @@ int paso_cpu() {
     return 1; // Continuar ejecutando
 }
 
+
+// --- HILO DEL TIMER ---
+// Este código corre en paralelo a la CPU
+void *hilo_timer(void *arg) {
+    CPU_t *cpu = (CPU_t *)arg;
+
+    while (cpu->ejecutando) {
+        // 1. Si el timer está configurado (valor > 0)
+        if (cpu->timer_periodo > 0) {
+            
+            // SIMULACION DE TIEMPO:
+            // Para que sea visible al ojo humano, usaremos usleep.
+            // Digamos que 1 ciclo simulado = 10 milisegundos.
+            // Si TTI es 50, dormimos 500ms.
+            usleep(cpu->timer_periodo * 10000); 
+
+            // 2. DISPARAR INTERRUPCIÓN
+            // Usamos Mutex para proteger la escritura
+            pthread_mutex_lock(&cpu->mutex);
+            
+            if (cpu->interrupcion_pendiente == 0) { // Si no hay otra pendiente
+                cpu->interrupcion_pendiente = 1;
+                cpu->codigo_interrupcion = 3; // Código 3 = Reloj (según PDF)
+            }
+            
+            pthread_mutex_unlock(&cpu->mutex);
+
+        } else {
+            // Si el timer está apagado (0), solo dormimos un poco para no quemar CPU
+            usleep(100000); 
+        }
+    }
+    return NULL;
+}
+
 void ejecutar_cpu() {
     logger_log("--- INICIANDO EJECUCION ---\n");
+    
     while (cpu.ejecutando) {
-        if (!paso_cpu()) {
-            cpu.ejecutando = 0; // Detener si paso_cpu retorna 0
+        
+        // 1. FASE DE VERIFICACIÓN DE INTERRUPCIONES (NUEVO)
+        pthread_mutex_lock(&cpu.mutex); // Ponemos el candado
+        
+        if (cpu.interrupcion_pendiente) {
+            // ¡El hilo del Timer nos dejó un mensaje!
+            logger_log("\n>>> [INT] Interrupcion Recibida: Codigo %d (Reloj) <<<\n", cpu.codigo_interrupcion);
+            
+            // Aquí la CPU reconoce que hubo una interrupción.
+            // En la Fase 2, aquí es donde guardaríamos el contexto y saltaríamos al Kernel.
+            // Por ahora, en Fase 1, solo bajamos la bandera y seguimos.
+            cpu.interrupcion_pendiente = 0;
         }
-        dump_cpu();
-        // Aquí podríamos poner un sleep() si fuera visualización lenta
+        
+        pthread_mutex_unlock(&cpu.mutex); // Quitamos el candado
+
+        // 2. FASE DE EJECUCIÓN NORMAL
+        if (!paso_cpu()) {
+            cpu.ejecutando = 0; // Detener si paso_cpu retorna 0 (Error o Halt)
+        }
+        
+        // Mostramos el estado (Opcional: podrías moverlo dentro de un 'if debug')
+        dump_cpu(); 
+        
+        // Simulación de velocidad (opcional)
+        usleep(100000); 
     }
+    
     logger_log("--- EJECUCION FINALIZADA ---\n");
 }
