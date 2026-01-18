@@ -5,6 +5,7 @@
 #include "../include/cpu.h" 
 #include "../include/constantes.h"
 #include "../include/logger.h"
+#include "../include/disco.h"
 #define MAX_VALOR 99999999
 #define MIN_VALOR -99999999
 
@@ -146,7 +147,13 @@ int paso_cpu() {
             int val = obtener_valor_operando(modo, operando);
             long long resultado_temp = (long long)cpu.AC + val; // Usamos long long para ver si se pasa
 
-            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+            if (resultado_temp > MAX_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 8;
+                cpu.psw.codigo_condicion = 3;
+            } else if (resultado_temp < MIN_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 7;
                 cpu.psw.codigo_condicion = 3;
             } else {
                 cpu.AC = (int)resultado_temp;
@@ -164,7 +171,13 @@ int paso_cpu() {
             int val = obtener_valor_operando(modo, operando);
             long long resultado_temp = (long long)cpu.AC - val;
 
-            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+            if (resultado_temp > MAX_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 8;
+                cpu.psw.codigo_condicion = 3;
+            } else if (resultado_temp < MIN_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 7;
                 cpu.psw.codigo_condicion = 3;
             } else {
                 cpu.AC = (int)resultado_temp;
@@ -182,7 +195,13 @@ int paso_cpu() {
             int val = obtener_valor_operando(modo, operando);
             long long resultado_temp = (long long)cpu.AC * val;
 
-            if (resultado_temp > MAX_VALOR || resultado_temp < MIN_VALOR) {
+            if (resultado_temp > MAX_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 8;
+                cpu.psw.codigo_condicion = 3;
+            } else if (resultado_temp < MIN_VALOR) {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 7;
                 cpu.psw.codigo_condicion = 3;
             } else {
                 cpu.AC = (int)resultado_temp;
@@ -204,8 +223,8 @@ int paso_cpu() {
                 else cpu.psw.codigo_condicion = 2;
             } else {
                 cpu.psw.codigo_condicion = 3; // Podemos usar el 3 también para Error Matemático
-                logger_log("[ERROR] Division por cero en PC=%d\n", cpu.psw.pc);
-                return 0;
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 8;
             }
             break;
         }
@@ -231,6 +250,9 @@ int paso_cpu() {
             if (dir_destino != -1 && validar_direccion(dir_destino)) {
                 cpu.memoria[dir_destino] = cpu.AC;
                 logger_log("      -> Guardado %d en Mem[%d]\n", cpu.AC, dir_destino);
+            } else {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 6;
             }
             break;
         }
@@ -255,7 +277,10 @@ int paso_cpu() {
             if (dir_destino != -1 && validar_direccion(dir_destino)) {
                 cpu.memoria[dir_destino] = cpu.RX;
                 logger_log("      -> Guardado RX (%d) en Mem[%d]\n", cpu.RX, dir_destino);
-                }
+            } else {
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 6;
+            }
             break;
         }
 
@@ -305,26 +330,26 @@ int paso_cpu() {
             break;
         }
 
-        case OP_J: // 27 - Salto Incondicional (Salta siempre)
-        {
-            cpu.psw.pc = cpu.RB + operando;
-            break;
-        }
-     
-
         // --- SISTEMA Y CONTROL (13-18) ---
         
         case OP_SVC: // Código 13: System Call (Llamada al Sistema)
+        {
             // Se usa para solicitar servicios al Kernel (como E/S o terminar).
             // En esta Fase 1, si AC=0 asumimos que se pide terminar la simulación.
+            cpu.interrupcion_pendiente = 1;
+            cpu.codigo_interrupcion = 2; // Llamada al sistema
+
             logger_log("      -> [SVC] Llamada al sistema detectada. Codigo en AC: %d\n", cpu.AC);
             if (cpu.AC == 0) {
                 logger_log("      -> [INFO] SVC 0: Solicitud de fin de programa.\n");
                 cpu.ejecutando = 0; // Detiene el bucle principal
             }
             break;
-
-        case OP_RETRN: // Código 14: Return (Retorno de Subrutina)
+        }
+        
+        case OP_RETRN: 
+        {
+            // Código 14: Return (Retorno de Subrutina)
             // Recupera el valor del PC que estaba guardado en el tope de la Pila.
             // Esto permite volver al lugar donde se llamó a la función.
             if (cpu.SP < (TAMANO_MEMORIA - INICIO_USUARIO - 1)) {
@@ -332,86 +357,103 @@ int paso_cpu() {
                 cpu.psw.pc = cpu.memoria[cpu.SP + cpu.RB]; // Leemos la dirección de retorno
                 logger_log("      -> [RETRN] Retornando a la direccion %d (Stack[%d])\n", cpu.psw.pc, cpu.SP);
             } else {
-                logger_log("      -> [ERROR] Stack Underflow al intentar RETRN.\n");
-                cpu.ejecutando = 0;
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 7;
             }
             break;
-
+        }
+        
         case OP_HAB: // Código 15: Habilitar Interrupciones
+        {
             cpu.psw.interrupciones = 1;
             logger_log("      -> [HAB] Interrupciones HABILITADAS.\n");
             break;
-
+        }
+        
         case OP_DHAB: // Código 16: Deshabilitar Interrupciones
+        {
             cpu.psw.interrupciones = 0;
             logger_log("      -> [DHAB] Interrupciones DESHABILITADAS.\n");
             break;
-
+        }
+        
         case OP_TTI: // 17 - Configurar Timer
+        {
             // Ahora sí guardamos el valor para que el hilo lo lea
             pthread_mutex_lock(&cpu.mutex); // Protegemos el cambio
             cpu.timer_periodo = operando;
             pthread_mutex_unlock(&cpu.mutex);
             
             logger_log("      -> [TTI] Timer configurado a %d ciclos (aprox %d ms).\n", 
-                       operando, operando * 10);
+                operando, operando * 10);
             break;
-
-        case OP_CHMOD: // Código 18
-            // 1. VALIDACIÓN DE SEGURIDAD:
-            // Solo el Modo Kernel (1) tiene permiso de usar esta instrucción.
-            // Si un usuario (0) intenta usarla, es una violación de privilegios.
+        }
+            
+        case OP_CHMOD: // 18
+        {
             if (cpu.psw.modo_operacion == 0) {
-                logger_log("      -> [ERROR] Violacion de Privilegios: CHMOD intentado en Modo Usuario.\n");
-                // Opcional: cpu.ejecutando = 0; // Matar el proceso rebelde
-                break;
-            }
-
-            // 2. VALIDACIÓN DE DATOS:
-            // Solo aceptamos 0 o 1. Si viene un 5, lo ignoramos o damos error.
-            if (operando == 0 || operando == 1) {
+                // [PDF] Privilegio -> Instrucción Inválida (5) o podemos definir una nueva.
+                // Usaremos 5 (Instrucción Invalida para este modo)
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 5; 
+                logger_log("      -> [ERROR] Violacion de Privilegios\n");
+            } else if (operando == 0 || operando == 1) {
                 cpu.psw.modo_operacion = operando;
-                logger_log("      -> [CHMOD] Transicion de modo a: %s\n", (operando ? "KERNEL" : "USUARIO"));
+                logger_log("      -> [CHMOD] Modo: %d\n", operando);
             } else {
-                logger_log("      -> [ERROR] CHMOD invalido. El modo %d no existe.\n", operando);
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 5; // Argumento invalido
             }
             break;
-
+        }
+            
         // --- PROTECCIÓN DE MEMORIA (19-22) ---
         // Estos registros delimitan qué parte de la memoria puede usar el programa actual.
-
+            
         case OP_LOADRB: // 19: Cargar Registro Base
+        {
             cpu.AC = cpu.RB; 
             logger_log("      -> [LOADRB] AC cargado con RB (%d)\n", cpu.RB);
             break;
-            
+        }
+        
         case OP_STRRB:  // 20: Guardar en Registro Base
+        {
             cpu.RB = cpu.AC; 
             logger_log("      -> [STRRB] RB actualizado con AC (%d)\n", cpu.RB);
             break;
-
+        }
+        
         case OP_LOADRL: // 21: Cargar Registro Límite
+        {
             cpu.AC = cpu.RL; 
             logger_log("      -> [LOADRL] AC cargado con RL (%d)\n", cpu.RL);
             break;
-
+        }
+        
         case OP_STRRL:  // 22: Guardar en Registro Límite
+        {
             cpu.RL = cpu.AC; 
             logger_log("      -> [STRRL] RL actualizado con AC (%d)\n", cpu.RL);
             break;
-
+        }
+        
         // --- MANEJO DE PILA (STACK) (23-26) ---
         
         case OP_LOADSP: // 23: Cargar Stack Pointer a AC
+        {
             cpu.AC = cpu.SP;
             logger_log("      -> [LOADSP] AC cargado con SP (%d)\n", cpu.AC);
             break;
-
+        }
+        
         case OP_STRSP:  // 24: Actualizar Stack Pointer desde AC
+        {
             cpu.SP = cpu.AC;
-             logger_log("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.SP);
+            logger_log("      -> [STRSP] SP actualizado con AC (%d)\n", cpu.SP);
             break;
-
+        }
+        
         case OP_PSH: // 25: PUSH
         {
             // 1. Calculamos la dirección física REAL
@@ -420,19 +462,19 @@ int paso_cpu() {
             // 2. Verificamos seguridad
             //    (SP >= 0) asegura que no bajemos más allá del piso 0 relativo
             if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
-
+                
                 cpu.memoria[dir_fisica] = cpu.AC; 
                 logger_log("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
-                    cpu.AC, dir_fisica, cpu.SP);
+                cpu.AC, dir_fisica, cpu.SP);
                 // 3. RESTAMOS Para pasar de 1700 (imaginario) a 1699 (real)
                 cpu.SP--;
             } else {
-                logger_log("      -> [ERROR] Stack Overflow (Fisica: %d)\n", dir_fisica);
-                cpu.ejecutando = 0;
+                cpu.interrupcion_pendiente = 1;
+                cpu.codigo_interrupcion = 8;
             }
             break;
         }
-
+        
         case OP_POP: // 26: POP (Desapilar)
         {
             // 1. VALIDAR SI HAY DATOS (Stack Underflow)
@@ -447,28 +489,99 @@ int paso_cpu() {
                 
                 // 3. CALCULAR DIRECCIÓN FÍSICA
                 int dir_fisica_pop = cpu.RB + cpu.SP;
-
+                
                 // 4. LEER EL DATO
                 cpu.AC = cpu.memoria[dir_fisica_pop];
                 
                 logger_log("      -> [POP] Recuperado %d de MemFisica[%d] (SP Logico: %d)\n", 
-                cpu.AC, dir_fisica_pop, cpu.SP);
-                       
-            } else {
-                logger_log("      -> [ERROR] Stack Underflow (La pila esta vacia)\n");
-                cpu.ejecutando = 0;
-            }
+                    cpu.AC, dir_fisica_pop, cpu.SP);
+                    
+                } else {
+                    cpu.interrupcion_pendiente = 1;
+                    cpu.codigo_interrupcion = 7;
+                }
+            break;
+        }
+            
+        case OP_J: // 27 - Salto Incondicional (Salta siempre)
+        {
+            cpu.psw.pc = cpu.RB + operando;
+            break;
+        }
+
+        // --- INSTRUCCIONES DE DISCO Y DMA (Fase 1) ---
+            
+        case OP_SDMAP: // SDMAP - Set DMA Pista
+        {
+            // Configura qué pista del disco queremos usar
+            pthread_mutex_lock(&cpu.mutex); // Protegemos el hardware
+            dma.pista_seleccionada = operando;
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAP] Pista seleccionada: %d\n", operando);
+            break;
+        }
+
+        case OP_SDMAC: // SDMAC - Set DMA Cilindro
+        {
+            // Configura qué cilindro
+            pthread_mutex_lock(&cpu.mutex);
+            dma.cilindro_seleccionado = operando;
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAC] Cilindro seleccionado: %d\n", operando);
+            break;
+        }
+
+        case OP_SDMAS: // SDMAS - Set DMA Sector
+        {
+            // Configura qué sector
+            pthread_mutex_lock(&cpu.mutex);
+            dma.sector_seleccionado = operando;
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAS] Sector seleccionado: %d\n", operando);
+            break;
+        }
+
+        case OP_SDMAIO: // SDMAIO - Set DMA I/O Direction
+        {
+            // Según tu tabla: "Establece si es I/O"
+            // Usaremos el operando: 1 = Escritura (RAM->Disco), 0 = Lectura (Disco->RAM)
+            pthread_mutex_lock(&cpu.mutex);
+            dma.es_escritura = operando; 
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAIO] Modo configurado: %s\n", 
+                       dma.es_escritura ? "ESCRITURA (Grabar)" : "LECTURA (Cargar)");
+            break;
+        }
+
+        case OP_SDMAM: // SDMAM - Set DMA Memory Address
+        {
+            // Según tu tabla: "Establece la posición de memoria a ser accedida"
+            pthread_mutex_lock(&cpu.mutex);
+            dma.direccion_memoria = operando;
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAM] Direccion de memoria RAM objetivo: %d\n", operando);
+            break;
+        }
+
+        case OP_SDMAON: // SDMAON - Encender DMA
+        {
+            // Esta instrucción es el "Gatillo". Arranca el hilo del DMA.
+            pthread_mutex_lock(&cpu.mutex);
+            dma.activo = 1; // ¡Despierta al hilo_dma en disco.c!
+            pthread_mutex_unlock(&cpu.mutex);
+            logger_log("      -> [SDMAON] ¡DMA ACTIVADO! Transferencia iniciada...\n");
             break;
         }
 
         default:
-            logger_log("[ERROR] Opcode %d no implementado aun.\n", opcode);
-            return 0;
+        {
+            cpu.interrupcion_pendiente = 1;
+            cpu.codigo_interrupcion = 5;
+        }
     }
     
     return 1; // Continuar ejecutando
 }
-
 
 // --- HILO DEL TIMER ---
 // Este código corre en paralelo a la CPU
@@ -509,31 +622,75 @@ void ejecutar_cpu() {
     
     while (cpu.ejecutando) {
         
-        // 1. FASE DE VERIFICACIÓN DE INTERRUPCIONES (NUEVO)
-        pthread_mutex_lock(&cpu.mutex); // Ponemos el candado
+        // ====================================================
+        // 1. FASE DE VERIFICACIÓN DE INTERRUPCIONES
+        // ====================================================
+        pthread_mutex_lock(&cpu.mutex); // 🔒
         
         if (cpu.interrupcion_pendiente) {
-            // ¡El hilo del Timer nos dejó un mensaje!
-            logger_log("\n>>> [INT] Interrupcion Recibida: Codigo %d (Reloj) <<<\n", cpu.codigo_interrupcion);
             
-            // Aquí la CPU reconoce que hubo una interrupción.
-            // En la Fase 2, aquí es donde guardaríamos el contexto y saltaríamos al Kernel.
-            // Por ahora, en Fase 1, solo bajamos la bandera y seguimos.
-            cpu.interrupcion_pendiente = 0;
+            // Tabla de Interrupciones
+            switch (cpu.codigo_interrupcion) {
+                
+                case 0: // SVC Inválido
+                    logger_log("\n>>> [INT] ERROR FATAL: Codigo SVC invalido (Cod 0) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                case 1: // Int Inválida
+                    logger_log("\n>>> [INT] ERROR FATAL: Codigo INT invalido (Cod 1) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                case 2: // SVC (Llamada al Sistema)
+                    logger_log("\n>>> [INT] SYSTEM CALL: Solicitud al Kernel (Cod 2) <<<\n");
+                    // Nota: Si es SVC 0 (Fin), el switch de opcode ya puso ejecutando=0.
+                    // Si es otro servicio (Fase 2), aquí NO apagamos.
+                    break;
+                case 3: // Reloj
+                    logger_log("\n>>> [INT] HARDWARE: Reloj (Cod 3) <<<\n");
+                    // ¡NO APAGAR! El reloj es vida.
+                    break;
+                case 4: // Fin E/S (DMA)
+                    logger_log("\n>>> [INT] HARDWARE: Fin DMA (Cod 4) <<<\n");
+                    // ¡NO APAGAR! El disco sigue girando.
+                    break;
+                case 5: // Instrucción Inválida
+                    logger_log("\n>>> [INT] ERROR FATAL: Instruccion Desconocida (Cod 5) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                case 6: // Dir Inválida
+                    logger_log("\n>>> [INT] ERROR FATAL: Violacion de Acceso a Memoria (Cod 6) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                case 7: // Underflow
+                    logger_log("\n>>> [INT] ERROR FATAL: Stack/Math Underflow (Cod 7) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                case 8: // Overflow
+                    logger_log("\n>>> [INT] ERROR FATAL: Stack/Math Overflow (Cod 8) <<<\n");
+                    cpu.ejecutando = 0; // <--- APAGAMOS
+                    break;
+                default:
+                    logger_log("\n>>> [INT] DESCONOCIDO: Codigo %d <<<\n", cpu.codigo_interrupcion);
+            }
+            
+            cpu.interrupcion_pendiente = 0; 
         }
         
-        pthread_mutex_unlock(&cpu.mutex); // Quitamos el candado
+        pthread_mutex_unlock(&cpu.mutex); // 🔓
 
-        // 2. FASE DE EJECUCIÓN NORMAL
-        if (!paso_cpu()) {
-            cpu.ejecutando = 0; // Detener si paso_cpu retorna 0 (Error o Halt)
+        // ====================================================
+        // 2. FASE DE EJECUCIÓN
+        // ====================================================
+        // Solo ejecutamos si seguimos vivos
+        if (cpu.ejecutando) {
+            if (!paso_cpu()) {
+                // Si paso_cpu devuelve 0, es una redundancia de seguridad
+                cpu.ejecutando = 0; 
+            }
+            
+            dump_cpu(); 
+            usleep(100000); // 100ms
         }
-        
-        // Mostramos el estado (Opcional: podrías moverlo dentro de un 'if debug')
-        dump_cpu(); 
-        
-        // Simulación de velocidad (opcional)
-        usleep(100000); 
     }
     
     logger_log("--- EJECUCION FINALIZADA ---\n");

@@ -3,6 +3,7 @@
 #include "../include/cpu.h"
 #include "../include/loader.h"
 #include "../include/logger.h"
+#include "../include/disco.h"
 
 int main(int argc, char *argv[]) {
     logger_init("logs/simulador.log");
@@ -10,6 +11,7 @@ int main(int argc, char *argv[]) {
 
     // 1. Inicializar Hardware
     inicializar_cpu();
+    inicializar_disco();
     
     // Inicializamos Mutex
     pthread_mutex_init(&cpu.mutex, NULL);
@@ -22,7 +24,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // CREAR EL HILO DEL TIMER (Nace el paralelismo)
+    // CREAR EL HILO DEL TIMER
     pthread_t thread_id;
     if (pthread_create(&thread_id, NULL, hilo_timer, &cpu) != 0) {
         logger_log("[ERROR] No se pudo crear el hilo del Timer.\n");
@@ -30,16 +32,25 @@ int main(int argc, char *argv[]) {
     }
     logger_log("[INFO] Hilo del Timer iniciado correctamente.\n");
 
+    // CREAR EL HILO DEL DMA
+    pthread_t thread_dma_id;
+    if (pthread_create(&thread_dma_id, NULL, hilo_dma, &cpu) != 0) {
+        logger_log("[ERROR] No se pudo crear el hilo del DMA.\n");
+        return 1;
+    }
+    logger_log("[INFO] Hilo del DMA iniciado correctamente.\n");
+
     // Opcional: Mostrar estado del cpu antes de arrancar
     dump_cpu();
 
     // Arrancar el cpu
     ejecutar_cpu();
-
+    
     // Esperamos al hilo y limpiamos
     pthread_join(thread_id, NULL);
+    pthread_join(thread_dma_id, NULL); // Esperar al DMA también
     pthread_mutex_destroy(&cpu.mutex);
-
+    
     // Opcional: Mostrar estado final del cpu
     dump_cpu();
 
