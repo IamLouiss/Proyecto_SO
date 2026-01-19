@@ -1,31 +1,43 @@
-_start 1
+_start 0
 .NumeroPalabras 20
-.NombreProg TestDMA
-// --- 1. Preparar Dato en Memoria ---
-04112345 // 00: LOAD 12345 -> Cargamos un valor en AC
-24000000 // 01: STRSP      -> (Truco: usaremos SP para apuntar a memoria 500)
-04100500 // 02: LOAD 500
-24000000 // 03: STRSP      -> SP = 500
-04112345 // 04: LOAD 12345 -> Dato a guardar
-25000000 // 05: PSH        -> Guardamos 12345 en Mem[500]
+.NombreProg test_full
 
-// --- 2. Configurar DMA para ESCRIBIR (RAM -> DISCO) ---
-28000000 // 06: SDMAP 0    -> Pista 0
-29000000 // 07: SDMAC 0    -> Cilindro 0
-30000000 // 08: SDMAS 0    -> Sector 0
-31000001 // 09: SDMAIO 1   -> 1 = ESCRITURA (RAM hacia Disco)
-32000800 // 10: SDMAM 800  -> Dirección de RAM donde está el dato (500)
+// --- 1. PRUEBA DE INTERRUPCION DE RELOJ (Cod 3) ---
+// Instruccion 17 (TTI). Ponemos el timer en 2 ciclos (muy rapido).
+// Op: 17, Modo: 0, Val: 00002 -> 17000002
+17000002
 
-// --- 3. Encender DMA ---
-15000000 // 11: HAB        -> Habilitamos interrupciones (Vital)
-33000000 // 12: SDMAON     -> ¡Fuego! (Arranca el hilo DMA)
+// Hacemos "tiempo" con sumas tontas para dejar que el timer explote
+// LOAD #1 (Op 04, Modo 1, Val 1)
+04100001
+// SUM #1 (Op 00, Modo 1, Val 1) - Repetimos varias veces
+00100001
+00100001
+00100001
 
-// --- 4. Bucle de Espera (Mientras el DMA trabaja en segundo plano) ---
-// Aquí la CPU se queda dando vueltas.
-// Deberías ver logs de "Instrucción ejecutada" MIENTRAS el DMA trabaja.
-04100000 // 13: LOAD 0
-00100001 // 14: SUM 1      -> Contamos ovejas...
-27000013 // 15: J 13       -> Volver a instrucción 13 (Bucle Infinito)
+// --- 2. PRUEBA DE SYSTEM CALL (Cod 2) ---
+// Instruccion 13 (SVC). 
+// Primero cargamos un valor != 0 en AC para que no sea "Salir" (SVC 0)
+// LOAD #5
+04100005
+// SVC (Op 13, Modo 0, Val 0)
+13000000
 
-// (El programa nunca llega aquí, la interrupción del DMA o del Reloj lo detendrá en log)
-13000000 // 16: SVC 0
+// --- 3. PRUEBA DE DMA (Cod 4) ---
+// Ya probamos que funciona, pero lo encendemos de nuevo.
+// Instruccion 33 (SDMAON)
+33000000
+// Mas sumas para esperar al disco
+00100001
+00100001
+00100001
+
+// --- 4. GRAN FINAL: ERROR FATAL (Cod 8 - Overflow/Error Matematico) ---
+// Vamos a dividir por cero.
+// LOAD #10
+04100010
+// DIV #0 (Op 03, Modo 1, Val 0) -> 03100000
+03100000
+
+// Si todo sale bien, el simulador debe morir aqui y no llegar a esta linea
+27000000

@@ -15,20 +15,18 @@ void logger_init(const char *filename) {
 void logger_log(const char *format, ...) {
     va_list args;
 
-    // 1. Escribir en la CONSOLA (Pantalla)
-    // USAMOS vprintf (Estándar de C) -> NO CAMBIAR
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-
-    // 2. Escribir en el ARCHIVO 
+    // --- MODIFICACIÓN: YA NO IMPRIMIMOS EN CONSOLA ---
+    // El PDF pide que el log registre todo, pero la consola solo muestre
+    // lo específico (Interrupciones y Debugger).
+    // Por eso, eliminamos el vprintf de aquí.
+    
+    // 2. Escribir SOLO en el ARCHIVO 
     if (log_file != NULL) {
-        // USAMOS vfprintf (Estándar de C) -> NO CAMBIAR
         va_start(args, format);
         vfprintf(log_file, format, args);
         va_end(args);
         
-        // Forzamos guardado
+        // Forzamos guardado para que el log se actualice en tiempo real
         fflush(log_file);
     }
 }

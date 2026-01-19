@@ -2,52 +2,86 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../include/cpu.h"
-#include "../include/constantes.h"
 #include "../include/loader.h"
 #include "../include/logger.h"
 
-int cargar_programa(const char *nombre_archivo) {
-    FILE *archivo;
-    char linea[256];
-    int direccion_actual = INICIO_USUARIO; // Empezamos a cargar desde la 300
-    int instruccion;
-
-    logger_log("[LOADER] Abriendo archivo: %s\n", nombre_archivo);
-
-    archivo = fopen(nombre_archivo, "r");
-    if (archivo == NULL) {
-        perror("[ERROR] No se pudo abrir el archivo");
-        return 0; // Fallo
+int cargar_programa(const char *filename, int direccion_carga, int *pc_inicial_out, char *nombre_prog_out, int *num_palabras_out) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("[ERROR] No se pudo abrir el archivo: %s\n", filename);
+        return -1;
     }
 
-    // Leemos línea por línea
-    while (fgets(linea, sizeof(linea), archivo)) {
-        // Ignoramos líneas que empiezan con punto (.) o guion bajo (_)
-        // o que están vacías
-        if (linea[0] == '.' || linea[0] == '_' || linea[0] == '\n' || linea[0] == ' ') {
+    logger_log("[LOADER] Iniciando carga de '%s' en Memoria[%d]\n", filename, direccion_carga);
+
+    char line[256];
+    int current_addr = direccion_carga;
+    
+    // Valores por defecto si no vienen en el archivo
+    *pc_inicial_out = 0; 
+    strcpy(nombre_prog_out, "Desconocido");
+    *num_palabras_out = 0; 
+
+    // --- PRIMERA PASADA: LEER METADATOS Y CARGAR CÓDIGO ---
+    while (fgets(line, sizeof(line), file)) {
+        
+        // Limpieza de saltos de línea
+        line[strcspn(line, "\r\n")] = 0;
+
+        // Ignorar líneas vacías o comentarios puros
+        if (line[0] == '\0' || line[0] == '/') continue;
+
+        // 1. Detectar _start
+        if (strncmp(line, "_start", 6) == 0) {
+            sscanf(line, "_start %d", pc_inicial_out);
             continue;
         }
 
-        // Intentamos leer un número decimal de 8 dígitos al inicio de la línea
-        // %d lee decimales
-        if (sscanf(linea, "%d", &instruccion) == 1) {
-            // Verificar que no desbordemos la memoria
-            if (direccion_actual >= TAMANO_MEMORIA) {
-                logger_log("[ERROR] El programa es demasiado grande para la memoria.\n");
-                break;
+        // 2. Detectar .NombreProg
+        if (strncmp(line, ".NombreProg", 11) == 0) {
+            char buffer_nombre[50];
+            if (sscanf(line, ".NombreProg %s", buffer_nombre) == 1) {
+                strcpy(nombre_prog_out, buffer_nombre);
             }
+            continue;
+        }
 
-            // Guardamos en la RAM de nuestra CPU
-            cpu.memoria[direccion_actual] = instruccion;
-            
-            logger_log("[MEM] Dir %04d: %08d cargado.\n", direccion_actual, instruccion);
-            
-            direccion_actual++;
+        // 3. Detectar .NumeroPalabras
+        if (strncmp(line, ".NumeroPalabras", 15) == 0) {
+            int val;
+            if (sscanf(line, ".NumeroPalabras %d", &val) == 1) {
+                *num_palabras_out = val;
+            }
+            continue;
+        }
+
+        // 4. Cargar Instrucciones (Números)
+        // Si la línea empieza con un dígito, es instrucción
+        if (line[0] >= '0' && line[0] <= '9') {
+            if (current_addr < TAMANO_MEMORIA) {
+                // Solo tomamos la primera palabra de la línea
+                char *token = strtok(line, " \t");
+                if (token) {
+                    cpu.memoria[current_addr] = atoi(token);
+                    logger_log("[MEM] Dir %04d: %08d cargado\n", current_addr, cpu.memoria[current_addr]);
+                    current_addr++;
+                }
+            } else {
+                printf("[ERROR] Memoria llena.\n");
+                fclose(file);
+                return -1;
+            }
         }
     }
 
-    fclose(archivo);
-    logger_log("[LOADER] Carga completada. %d instrucciones cargadas.\n", direccion_actual - INICIO_USUARIO);
+    fclose(file);
+    
+    // Validación de seguridad:
+    // Si el archivo no traía .NumeroPalabras, usamos lo que contamos al cargar
+    int instrucciones_reales = current_addr - direccion_carga;
+    if (*num_palabras_out == 0) {
+        *num_palabras_out = instrucciones_reales;
+    }
 
-    return 1; // Éxito
+    return 0; // Éxito
 }

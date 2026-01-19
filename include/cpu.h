@@ -63,8 +63,8 @@ void dump_cpu();
 int paso_cpu();
 
 // Bucle principal que llama a paso_cpu hasta terminar
-void ejecutar_cpu();
+void ejecutar_cpu(int modo_debug);
 
 void *hilo_timer(void *arg);
 
-#endif // CPU_H
+#endif

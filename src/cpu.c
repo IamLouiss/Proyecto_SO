@@ -61,7 +61,7 @@ int validar_direccion(int dir_fisica) {
     }
 
     // En Modo Usuario (0), verificamos los límites
-    if (dir_fisica < cpu.RB || dir_fisica > cpu.RL) {
+    if (dir_fisica < cpu.RB || dir_fisica >= cpu.RL) {
         logger_log("[INT] Violacion de segmento: Dir %d fuera de rango (%d-%d)\n", 
                dir_fisica, cpu.RB, cpu.RL);
         // Aquí deberíamos disparar la interrupción INT_DIR_INVALIDA
@@ -352,7 +352,8 @@ int paso_cpu() {
             // Código 14: Return (Retorno de Subrutina)
             // Recupera el valor del PC que estaba guardado en el tope de la Pila.
             // Esto permite volver al lugar donde se llamó a la función.
-            if (cpu.SP < (TAMANO_MEMORIA - INICIO_USUARIO - 1)) {
+            int tope = (cpu.RL - cpu.RB) - 1;
+            if (cpu.SP < tope) {
                 cpu.SP++; // Pasamos de la posicion vacia a la llena
                 cpu.psw.pc = cpu.memoria[cpu.SP + cpu.RB]; // Leemos la dirección de retorno
                 logger_log("      -> [RETRN] Retornando a la direccion %d (Stack[%d])\n", cpu.psw.pc, cpu.SP);
@@ -461,7 +462,7 @@ int paso_cpu() {
             
             // 2. Verificamos seguridad
             //    (SP >= 0) asegura que no bajemos más allá del piso 0 relativo
-            if (cpu.SP >= 0 && dir_fisica < TAMANO_MEMORIA) {
+            if (cpu.SP >= 0 && dir_fisica < cpu.RL) {
                 
                 cpu.memoria[dir_fisica] = cpu.AC; 
                 logger_log("      -> [PSH] Valor %d apilado en MemFisica[%d] (SP Logico: %d)\n", 
@@ -480,7 +481,7 @@ int paso_cpu() {
             // 1. VALIDAR SI HAY DATOS (Stack Underflow)
             // Tu tope inicial calculado es (cpu.RL - cpu.RB) = 1699.
             // Si SP = 1699, significa que no hemos hecho ningún PUSH todavía.
-            int tope = TAMANO_MEMORIA - INICIO_USUARIO - 1;
+            int tope = (cpu.RL - cpu.RB) - 1;;
             if (cpu.SP < tope) { 
                 
                 // 2. SUMAR PRIMERO (Pre-incremento)
@@ -617,9 +618,18 @@ void *hilo_timer(void *arg) {
     return NULL;
 }
 
-void ejecutar_cpu() {
-    logger_log("--- INICIANDO EJECUCION ---\n");
+void ejecutar_cpu(int modo_debug) { 
+    logger_log("--- INICIANDO EJECUCION (Modo: %s) ---\n", modo_debug ? "DEBUG" : "NORMAL");
     
+    // Mensaje de bienvenida del Debugger (Solo consola)
+    if (modo_debug) {
+        printf("\n=== MODO DEBUGGER ACTIVADO ===\n");
+        printf("Comandos:\n");
+        printf("  [ENTER] Siguiente Instruccion\n");
+        printf("  [R]     Ver Registros Completos\n");
+        printf("  [Q]     Salir de la ejecucion\n");
+    }
+
     while (cpu.ejecutando) {
         
         // ====================================================
@@ -629,69 +639,91 @@ void ejecutar_cpu() {
         
         if (cpu.interrupcion_pendiente) {
             
-            // Tabla de Interrupciones
+            // REQUISITO PDF PUNTO 3: 
+            // "Cuando ocurra una interrupción debe imprimirse un mensaje tanto en el log, 
+            // como en la salida estándar".
+            
+            // Variable auxiliar para el mensaje
+            char msg[100]; 
+
             switch (cpu.codigo_interrupcion) {
                 
-                case 0: // SVC Inválido
-                    logger_log("\n>>> [INT] ERROR FATAL: Codigo SVC invalido (Cod 0) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
+                // --- ERRORES FATALES ---
+                case 0: sprintf(msg, "ERROR FATAL: Codigo SVC invalido (0)"); cpu.ejecutando = 0; break;
+                case 1: sprintf(msg, "ERROR FATAL: Codigo INT invalido (1)"); cpu.ejecutando = 0; break;
+                case 5: sprintf(msg, "ERROR FATAL: Instruccion Ilegal (5)"); cpu.ejecutando = 0; break;
+                case 6: sprintf(msg, "ERROR FATAL: Direccion Invalida (6)"); cpu.ejecutando = 0; break;
+                case 7: sprintf(msg, "ERROR FATAL: Stack Underflow (7)"); cpu.ejecutando = 0; break;
+                case 8: sprintf(msg, "ERROR FATAL: Stack Overflow (8)"); cpu.ejecutando = 0; break;
+
+                // --- EVENTOS NORMALES ---
+                case 2: 
+                    sprintf(msg, "SYSTEM CALL (Cod 2)");
+                    if (cpu.AC == 0) cpu.ejecutando = 0; 
                     break;
-                case 1: // Int Inválida
-                    logger_log("\n>>> [INT] ERROR FATAL: Codigo INT invalido (Cod 1) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
-                    break;
-                case 2: // SVC (Llamada al Sistema)
-                    logger_log("\n>>> [INT] SYSTEM CALL: Solicitud al Kernel (Cod 2) <<<\n");
-                    // Nota: Si es SVC 0 (Fin), el switch de opcode ya puso ejecutando=0.
-                    // Si es otro servicio (Fase 2), aquí NO apagamos.
-                    break;
-                case 3: // Reloj
-                    logger_log("\n>>> [INT] HARDWARE: Reloj (Cod 3) <<<\n");
-                    // ¡NO APAGAR! El reloj es vida.
-                    break;
-                case 4: // Fin E/S (DMA)
-                    logger_log("\n>>> [INT] HARDWARE: Fin DMA (Cod 4) <<<\n");
-                    // ¡NO APAGAR! El disco sigue girando.
-                    break;
-                case 5: // Instrucción Inválida
-                    logger_log("\n>>> [INT] ERROR FATAL: Instruccion Desconocida (Cod 5) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
-                    break;
-                case 6: // Dir Inválida
-                    logger_log("\n>>> [INT] ERROR FATAL: Violacion de Acceso a Memoria (Cod 6) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
-                    break;
-                case 7: // Underflow
-                    logger_log("\n>>> [INT] ERROR FATAL: Stack/Math Underflow (Cod 7) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
-                    break;
-                case 8: // Overflow
-                    logger_log("\n>>> [INT] ERROR FATAL: Stack/Math Overflow (Cod 8) <<<\n");
-                    cpu.ejecutando = 0; // <--- APAGAMOS
-                    break;
-                default:
-                    logger_log("\n>>> [INT] DESCONOCIDO: Codigo %d <<<\n", cpu.codigo_interrupcion);
+                case 3: sprintf(msg, "RELOJ (Cod 3)"); break;
+                case 4: sprintf(msg, "FIN DE E/S (DMA) (Cod 4)"); break;
+                    
+                default: sprintf(msg, "DESCONOCIDO (Cod %d)", cpu.codigo_interrupcion); break;
             }
+            
+            // IMPRIMIMOS EN AMBOS LADOS (Cumpliendo Requisito 3)
+            logger_log("\n>>> [INT] %s <<<\n", msg); // Al archivo
+            printf("\n>>> [INT] %s <<<\n", msg);      // A la pantalla
             
             cpu.interrupcion_pendiente = 0; 
         }
         
         pthread_mutex_unlock(&cpu.mutex); // 🔓
 
+        if (!cpu.ejecutando) break;
+
         // ====================================================
-        // 2. FASE DE EJECUCIÓN
+        // 2. MODO DEBUGGER (Solo Consola)
         // ====================================================
-        // Solo ejecutamos si seguimos vivos
+        if (modo_debug) {
+            printf("\n[DEBUG] PC:%04d | Prox Instr: %08d ", 
+                   cpu.psw.pc, cpu.memoria[cpu.psw.pc]);
+            
+            char cmd = getchar();
+            if (cmd != '\n') while(getchar() != '\n'); 
+
+            if (cmd == 'q' || cmd == 'Q') {
+                printf("[DEBUG] Cancelando ejecucion...\n");
+                cpu.ejecutando = 0;
+                break;
+            }
+            else if (cmd == 'r' || cmd == 'R') {
+                printf("\n   === INSPECTOR DE REGISTROS ===\n");
+                printf("   AC : %08d (Int: %d)\n", cpu.AC, cpu.AC);
+                printf("   MAR: %04d     | MDR: %08d\n", cpu.MAR, cpu.MDR);
+                printf("   IR : %08d\n", cpu.IR);
+                printf("   PC : %04d\n", cpu.psw.pc);
+                printf("   SP : %04d     | RX : %04d\n", cpu.SP, cpu.RX);
+                printf("   RB : %04d     | RL : %04d\n", cpu.RB, cpu.RL);
+                printf("   CC : %d        | Modo : %d | Int : %d\n", 
+                       cpu.psw.codigo_condicion, cpu.psw.modo_operacion, cpu.psw.interrupciones);
+                printf("   ------------------------------\n");
+                printf("Presione ENTER para continuar...");
+                while(getchar() != '\n');
+            }
+        }
+
+        // ====================================================
+        // 3. FASE DE EJECUCIÓN (Silenciosa en pantalla)
+        // ====================================================
         if (cpu.ejecutando) {
             if (!paso_cpu()) {
-                // Si paso_cpu devuelve 0, es una redundancia de seguridad
                 cpu.ejecutando = 0; 
             }
             
-            dump_cpu(); 
-            usleep(100000); // 100ms
+            dump_cpu(); // Esto va al log (src/cpu.c dump_cpu usa logger_log)
+            
+            if (!modo_debug) usleep(50000); 
         }
     }
     
     logger_log("--- EJECUCION FINALIZADA ---\n");
+    if (modo_debug) printf("\n=== FIN DEL PROGRAMA ===\nPresione ENTER para volver al menu...");
+    if (modo_debug) while(getchar() != '\n');
 }

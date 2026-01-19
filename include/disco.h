@@ -40,4 +40,4 @@ extern DMA_t dma;
 void inicializar_disco();
 void *hilo_dma(void *arg); // El hilo que moverá los datos
 
-#endif // DISCO_H
+#endif
