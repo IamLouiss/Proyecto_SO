@@ -10,4 +10,8 @@
 // Retorna: 0 si todo salió bien, -1 si hubo error.
 int cargar_programa(const char *filename, int dir_carga, int *pc_inicial_out, char *nombre_prog_out, int *num_palabras_out);
 
+// NUEVA: Solo lee el encabezado para validar espacio antes de cargar
+// Retorna -1 si falla, o el numero de palabras declaradas si tiene exito.
+int obtener_metadatos_programa(const char *filename, char *nombre_out, int *tamano_out);
+
 #endif

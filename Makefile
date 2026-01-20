@@ -22,7 +22,7 @@ obj/%.o: src/%.c
 
 # Crear carpetas si no existen
 directories:
-	mkdir -p bin obj logs
+	mkdir -p bin obj logs data
 
 # Limpiar (make clean)
 clean:

@@ -85,3 +85,35 @@ int cargar_programa(const char *filename, int direccion_carga, int *pc_inicial_o
 
     return 0; // Éxito
 }
+
+// Función auxiliar para "mirar" el archivo antes de cargarlo
+int obtener_metadatos_programa(const char *filename, char *nombre_out, int *tamano_out) {
+    FILE *file = fopen(filename, "r");
+    if (!file) return -1;
+
+    char line[256];
+    *tamano_out = 0;
+    strcpy(nombre_out, "Desconocido");
+
+    int encontrados = 0; // Para saber si encontramos ambas cosas
+
+    while (fgets(line, sizeof(line), file)) {
+        // Limpieza rapida
+        line[strcspn(line, "\r\n")] = 0;
+        
+        if (strncmp(line, ".NombreProg", 11) == 0) {
+            sscanf(line, ".NombreProg %s", nombre_out);
+            encontrados++;
+        }
+        else if (strncmp(line, ".NumeroPalabras", 15) == 0) {
+            sscanf(line, ".NumeroPalabras %d", tamano_out);
+            encontrados++;
+        }
+
+        // Si ya tenemos los datos, no necesitamos leer más
+        if (encontrados >= 2) break;
+    }
+
+    fclose(file);
+    return (*tamano_out > 0) ? *tamano_out : 0; 
+}
