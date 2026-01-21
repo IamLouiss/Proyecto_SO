@@ -1,0 +1,23 @@
+_start 0
+.NumeroPalabras 22
+.NombreProg test_dma
+04100777 // LOAD 777 Dato a guardar
+05000050 // STR 50   Guarda 777 en RAM[50]
+28100000 // SDMAP 0  Pista 0
+29100000 // SDMAC 0  Cilindro 0
+30100000 // SDMAS 0  Sector 0
+31100001 // SDMAIO 1 Modo Escritura: RAM->Disco
+32100050 // SDMAM 50 Direccion RAM 50
+33000000 // SDMAON   Ejecuta DMA. Guarda 777 en Disco
+04100000 // LOAD 0   Limpia AC
+05000050 // STR 50   Borra el 777 de la RAM[50]
+31100000 // SDMAIO 0 Modo Lectura: Disco->RAM
+33000000 // SDMAON   Ejecuta DMA. Trae 777 a RAM[50]
+04100000 // LOAD 0   Limpia AC
+00000050 // SUM 50   Suma lo que hay en RAM[50]. AC deberia ser 777
+17100005 // TTI 5    Configura Timer cada 5 ciclos
+04100001 // LOAD 1   Ciclo de espera 1
+04100002 // LOAD 2   Ciclo de espera 2
+04100003 // LOAD 3   Ciclo de espera 3
+04100000 // LOAD 0   Carga 0 en AC para indicar fin del programa
+13100000 // SVC 0    Fin del programa

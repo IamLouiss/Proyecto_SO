@@ -3,41 +3,46 @@
 
 #include "constantes.h"
 
-// --- DEFINICIONES FÍSICAS DEL DISCO ---
-#define DISCO_PISTAS    10
-#define DISCO_CILINDROS 10
-#define DISCO_SECTORES  100
-#define TAMANO_SECTOR   9   // "Cada sector tiene un dato de 9 caracteres"
+// Definiciones fisicas del disco
+#define DISCO_PISTAS    10  // Numero de pistas
+#define DISCO_CILINDROS 10  // Numero de cilindros
+#define DISCO_SECTORES  100 // Numero de sectores
+#define TAMANO_SECTOR   9   // Cada sector tiene un dato de 9 caracteres
 
-// Estructura de un Sector (La unidad mínima de almacenamiento)
+// Estructura de un sector
 typedef struct {
     char datos[TAMANO_SECTOR]; 
 } Sector_t;
 
-// El Disco Duro completo (Matriz 3D)
+// Estructura del disco duro completo
 typedef struct {
     Sector_t plato[DISCO_PISTAS][DISCO_CILINDROS][DISCO_SECTORES];
 } Disco_t;
 
-// --- CONTROLADOR DMA (El intermediario) ---
+// Controlador del DMA
 typedef struct {
-    // Registros de configuración (Llenados por instrucciones SDMAP, SDMAC, etc.)
-    int pista_seleccionada;
-    int cilindro_seleccionado;
-    int sector_seleccionado;
-    int direccion_memoria; // A dónde va/viene el dato en RAM
+    // Registros de configuracion (Usa las instrucciones SDMAP, SDMAC y SDMAS)
+    int pista_seleccionada;    // Se le asigna la pista a leer/escribir con la instruccion SDMAP
+    int cilindro_seleccionado; // Se le asigna el cilindro a leer/escribir con la instruccion SDMAC
+    int sector_seleccionado;   // Se le asigna el sector a leer/escribir con la instruccion SDMAS
+    int direccion_memoria;     // A donde va/viene el dato en RAM
     
-    int es_escritura;      // 0 = Leer del Disco (Disk->RAM), 1 = Escribir (RAM->Disk)
-    int estado;            // Registro ESTADOdma (0=Exito, 1=Error)
-    int activo;            // 1 = Trabajando, 0 = Inactivo
+    int es_escritura;      // Bandera para el tipo de operacion: 0 = Lectura (Disco -> RAM), 1 = Escritura (RAM -> Disco)
+    int estado;            // Registro para el estado del DMA: 0 = Exito, 1 = Error
+    int activo;            // Bandera para determinar el funcionamiento del DMA: 1 = Trabajando, 0 = Inactivo
 } DMA_t;
 
-// Variables Globales (Para que cpu.c y main.c las vean)
+// Variables globales
 extern Disco_t disco;
 extern DMA_t dma;
 
 // Funciones
+
+// Limpia el disco y resetea el DMA
 void inicializar_disco();
-void *hilo_dma(void *arg); // El hilo que moverá los datos
+
+// Funcion del hilo que simula el trabajo mecanico del disco
+// Corre en paralelo a la CPU esperando ordenes
+void *hilo_dma(void *arg);
 
 #endif

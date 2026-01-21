@@ -1,0 +1,330 @@
+--- INICIO DEL SIMULADOR ---
+Info: CPU inicializada. Modo Kernel. Memoria limpia (0-1999).
+Disco: Hardware inicializado (10 pistas, 10 cilindros, 100 sectores).
+Loader: Cargando 'data/programa_1.txt' en RAM[300]
+[MEM] RAM[0300] = 04100010
+[MEM] RAM[0301] = 00100005
+[MEM] RAM[0302] = 25000000
+[MEM] RAM[0303] = 04100000
+[MEM] RAM[0304] = 26000000
+[MEM] RAM[0305] = 08100015
+[MEM] RAM[0306] = 09000009
+[MEM] RAM[0307] = 04100999
+[MEM] RAM[0308] = 27000011
+[MEM] RAM[0309] = 04100000
+[MEM] RAM[0310] = 13100000
+Loader: Cargando 'data/programa_2.txt' en RAM[413]
+[MEM] RAM[0413] = 04100777
+[MEM] RAM[0414] = 05000050
+[MEM] RAM[0415] = 28100000
+[MEM] RAM[0416] = 29100000
+[MEM] RAM[0417] = 30100000
+[MEM] RAM[0418] = 31100001
+[MEM] RAM[0419] = 32100050
+[MEM] RAM[0420] = 33000000
+[MEM] RAM[0421] = 04100000
+[MEM] RAM[0422] = 05000050
+[MEM] RAM[0423] = 31100000
+[MEM] RAM[0424] = 33000000
+[MEM] RAM[0425] = 04100000
+[MEM] RAM[0426] = 00000050
+[MEM] RAM[0427] = 17100005
+[MEM] RAM[0428] = 04100001
+[MEM] RAM[0429] = 04100002
+[MEM] RAM[0430] = 04100003
+[MEM] RAM[0431] = 04100000
+[MEM] RAM[0432] = 13100000
+--- Iniciando ejecucion en modo: normal ---
+Exec: PC:0300 | IR:04100010 -> OP:04 M:1 VAL:00010
+
+=== ESTADO CPU ===
+PC: 0301 | IR: 04100010 | AC: 00000010
+MAR: 0300 | MDR: 04100010
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0301 | IR:00100005 -> OP:00 M:1 VAL:00005
+
+=== ESTADO CPU ===
+PC: 0302 | IR: 00100005 | AC: 00000015
+MAR: 0301 | MDR: 00100005
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0302 | IR:25000000 -> OP:25 M:0 VAL:00000
+      -> PSH: Valor 15 apilado en MemFisica[411] (SP Logico: 111)
+
+=== ESTADO CPU ===
+PC: 0303 | IR: 25000000 | AC: 00000015
+MAR: 0302 | MDR: 25000000
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=110 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0303 | IR:04100000 -> OP:04 M:1 VAL:00000
+
+=== ESTADO CPU ===
+PC: 0304 | IR: 04100000 | AC: 00000000
+MAR: 0303 | MDR: 04100000
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=110 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0304 | IR:26000000 -> OP:26 M:0 VAL:00000
+      -> POP: Recuperado 15 de MemFisica[411] (SP Logico: 111)
+
+=== ESTADO CPU ===
+PC: 0305 | IR: 26000000 | AC: 00000015
+MAR: 0304 | MDR: 26000000
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0305 | IR:08100015 -> OP:08 M:1 VAL:00015
+
+=== ESTADO CPU ===
+PC: 0306 | IR: 08100015 | AC: 00000015
+MAR: 0305 | MDR: 08100015
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0306 | IR:09000009 -> OP:09 M:0 VAL:00009
+
+=== ESTADO CPU ===
+PC: 0309 | IR: 09000009 | AC: 00000015
+MAR: 0306 | MDR: 09000009
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0309 | IR:04100000 -> OP:04 M:1 VAL:00000
+
+=== ESTADO CPU ===
+PC: 0310 | IR: 04100000 | AC: 00000000
+MAR: 0309 | MDR: 04100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+Exec: PC:0310 | IR:13100000 -> OP:13 M:1 VAL:00000
+      -> SVC: Llamada al sistema detectada. Codigo en AC: 0
+      -> Info: SVC 0: Solicitud de fin de programa.
+
+=== ESTADO CPU ===
+PC: 0311 | IR: 13100000 | AC: 00000000
+MAR: 0310 | MDR: 13100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=111 RX=312
+RB=300 | RL=412
+==================
+--- Ejecucion finalizada ---
+--- Iniciando ejecucion en modo: normal ---
+Exec: PC:0413 | IR:04100777 -> OP:04 M:1 VAL:00777
+
+=== ESTADO CPU ===
+PC: 0414 | IR: 04100777 | AC: 00000777
+MAR: 0413 | MDR: 04100777
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0414 | IR:05000050 -> OP:05 M:0 VAL:00050
+      -> Guardado 777 en Mem[463]
+
+=== ESTADO CPU ===
+PC: 0415 | IR: 05000050 | AC: 00000777
+MAR: 0414 | MDR: 05000050
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0415 | IR:28100000 -> OP:28 M:1 VAL:00000
+      -> SDMAP: Pista seleccionada: 0
+
+=== ESTADO CPU ===
+PC: 0416 | IR: 28100000 | AC: 00000777
+MAR: 0415 | MDR: 28100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0416 | IR:29100000 -> OP:29 M:1 VAL:00000
+      -> SDMAC: Cilindro seleccionado: 0
+
+=== ESTADO CPU ===
+PC: 0417 | IR: 29100000 | AC: 00000777
+MAR: 0416 | MDR: 29100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0417 | IR:30100000 -> OP:30 M:1 VAL:00000
+      -> SDMAS: Sector seleccionado: 0
+
+=== ESTADO CPU ===
+PC: 0418 | IR: 30100000 | AC: 00000777
+MAR: 0417 | MDR: 30100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0418 | IR:31100001 -> OP:31 M:1 VAL:00001
+      -> SDMAIO: Modo configurado: escritura
+
+=== ESTADO CPU ===
+PC: 0419 | IR: 31100001 | AC: 00000777
+MAR: 0418 | MDR: 31100001
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0419 | IR:32100050 -> OP:32 M:1 VAL:00050
+      -> SDMAM: Direccion de memoria RAM objetivo: 50
+
+=== ESTADO CPU ===
+PC: 0420 | IR: 32100050 | AC: 00000777
+MAR: 0419 | MDR: 32100050
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0420 | IR:33000000 -> OP:33 M:0 VAL:00000
+      -> SDMAON: DMA activado
+
+=== ESTADO CPU ===
+PC: 0421 | IR: 33000000 | AC: 00000777
+MAR: 0420 | MDR: 33000000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+DMA Escritura: RAM[463] (777) -> Disco[0][0][0]
+
+>>> Int: Fin de E/S (DMA) (4) <<<
+Exec: PC:0421 | IR:04100000 -> OP:04 M:1 VAL:00000
+
+=== ESTADO CPU ===
+PC: 0422 | IR: 04100000 | AC: 00000000
+MAR: 0421 | MDR: 04100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0422 | IR:05000050 -> OP:05 M:0 VAL:00050
+      -> Guardado 0 en Mem[463]
+
+=== ESTADO CPU ===
+PC: 0423 | IR: 05000050 | AC: 00000000
+MAR: 0422 | MDR: 05000050
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0423 | IR:31100000 -> OP:31 M:1 VAL:00000
+      -> SDMAIO: Modo configurado: lectura
+
+=== ESTADO CPU ===
+PC: 0424 | IR: 31100000 | AC: 00000000
+MAR: 0423 | MDR: 31100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0424 | IR:33000000 -> OP:33 M:0 VAL:00000
+      -> SDMAON: DMA activado
+
+=== ESTADO CPU ===
+PC: 0425 | IR: 33000000 | AC: 00000000
+MAR: 0424 | MDR: 33000000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+DMA Lectura: Disco[0][0][0] ('777') -> RAM[463] (777)
+
+>>> Int: Fin de E/S (DMA) (4) <<<
+Exec: PC:0425 | IR:04100000 -> OP:04 M:1 VAL:00000
+
+=== ESTADO CPU ===
+PC: 0426 | IR: 04100000 | AC: 00000000
+MAR: 0425 | MDR: 04100000
+PSW: CC=0 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0426 | IR:00000050 -> OP:00 M:0 VAL:00050
+
+=== ESTADO CPU ===
+PC: 0427 | IR: 00000050 | AC: 00000777
+MAR: 0426 | MDR: 00000050
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0427 | IR:17100005 -> OP:17 M:1 VAL:00005
+      -> TTI: Timer configurado a 5 ciclos.
+
+=== ESTADO CPU ===
+PC: 0428 | IR: 17100005 | AC: 00000777
+MAR: 0427 | MDR: 17100005
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0428 | IR:04100001 -> OP:04 M:1 VAL:00001
+
+=== ESTADO CPU ===
+PC: 0429 | IR: 04100001 | AC: 00000001
+MAR: 0428 | MDR: 04100001
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+Exec: PC:0429 | IR:04100002 -> OP:04 M:1 VAL:00002
+
+=== ESTADO CPU ===
+PC: 0430 | IR: 04100002 | AC: 00000002
+MAR: 0429 | MDR: 04100002
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+
+>>> Int: Reloj (3) <<<
+Exec: PC:0430 | IR:04100003 -> OP:04 M:1 VAL:00003
+
+=== ESTADO CPU ===
+PC: 0431 | IR: 04100003 | AC: 00000003
+MAR: 0430 | MDR: 04100003
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+
+>>> Int: Reloj (3) <<<
+Exec: PC:0431 | IR:04100000 -> OP:04 M:1 VAL:00000
+
+=== ESTADO CPU ===
+PC: 0432 | IR: 04100000 | AC: 00000000
+MAR: 0431 | MDR: 04100000
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+
+>>> Int: Reloj (3) <<<
+Exec: PC:0432 | IR:13100000 -> OP:13 M:1 VAL:00000
+      -> SVC: Llamada al sistema detectada. Codigo en AC: 0
+      -> Info: SVC 0: Solicitud de fin de programa.
+
+=== ESTADO CPU ===
+PC: 0433 | IR: 13100000 | AC: 00000000
+MAR: 0432 | MDR: 13100000
+PSW: CC=2 Modo=1 Int=0
+Stack: SP=121 RX=435
+RB=413 | RL=535
+==================
+--- Ejecucion finalizada ---

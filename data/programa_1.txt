@@ -1,0 +1,14 @@
+_start 0
+.NumeroPalabras 12
+.NombreProg test_cpu
+04100010 // LOAD 10  Carga inmed 10 en AC
+00100005 // SUM 5    Suma 5. AC = 15
+25000000 // PSH      Apila 15 en el Stack
+04100000 // LOAD 0   Limpia AC
+26000000 // POP      Recupera 15 del Stack. AC = 15
+08100015 // COMP 15  Compara AC con 15
+09000009 // JMPE 9   Si son iguales, salta a la linea 9
+04100999 // LOAD 999 Esto NO deberia ejecutarse si el salto sirve
+27000011 // J 11     Salto incondicional al final
+04100000 // LOAD 0   Carga 0 para indicar fin de ejecucion
+13100000 // SVC 0    Fin del programa

@@ -5,115 +5,108 @@
 #include "../include/loader.h"
 #include "../include/logger.h"
 
-int cargar_programa(const char *filename, int direccion_carga, int *pc_inicial_out, char *nombre_prog_out, int *num_palabras_out) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        printf("[ERROR] No se pudo abrir el archivo: %s\n", filename);
+// Funcion para cargar el programa:
+int cargar_programa(const char *nombre_archivo, int direccion_carga, int *pc_inicial_out, char *nombre_prog_out, int *num_palabras_out) {
+    FILE *archivo = fopen(nombre_archivo, "r"); // Abrimos el archivo para lectura
+    if (!archivo) {
+        logger_log("Error: No se pudo abrir %s\n", nombre_archivo);
+        printf("Error: No se pudo abrir: %s\n", nombre_archivo);
         return -1;
     }
 
-    logger_log("[LOADER] Iniciando carga de '%s' en Memoria[%d]\n", filename, direccion_carga);
+    logger_log("Loader: Cargando '%s' en RAM[%d]\n", nombre_archivo, direccion_carga);
 
-    char line[256];
-    int current_addr = direccion_carga;
+    char linea[256];
+    int dirrecion_actual = direccion_carga;
+    int instrucciones_cargadas = 0;
     
-    // Valores por defecto si no vienen en el archivo
+    // Valores por defecto
     *pc_inicial_out = 0; 
-    strcpy(nombre_prog_out, "Desconocido");
-    *num_palabras_out = 0; 
+    strcpy(nombre_prog_out, "SinNombre");
+    *num_palabras_out = 0;
 
-    // --- PRIMERA PASADA: LEER METADATOS Y CARGAR CÓDIGO ---
-    while (fgets(line, sizeof(line), file)) {
-        
-        // Limpieza de saltos de línea
-        line[strcspn(line, "\r\n")] = 0;
-
-        // Ignorar líneas vacías o comentarios puros
-        if (line[0] == '\0' || line[0] == '/') continue;
-
-        // 1. Detectar _start
-        if (strncmp(line, "_start", 6) == 0) {
-            sscanf(line, "_start %d", pc_inicial_out);
-            continue;
-        }
-
-        // 2. Detectar .NombreProg
-        if (strncmp(line, ".NombreProg", 11) == 0) {
-            char buffer_nombre[50];
-            if (sscanf(line, ".NombreProg %s", buffer_nombre) == 1) {
-                strcpy(nombre_prog_out, buffer_nombre);
-            }
-            continue;
-        }
-
-        // 3. Detectar .NumeroPalabras
-        if (strncmp(line, ".NumeroPalabras", 15) == 0) {
-            int val;
-            if (sscanf(line, ".NumeroPalabras %d", &val) == 1) {
-                *num_palabras_out = val;
-            }
-            continue;
-        }
-
-        // 4. Cargar Instrucciones (Números)
-        // Si la línea empieza con un dígito, es instrucción
-        if (line[0] >= '0' && line[0] <= '9') {
-            if (current_addr < TAMANO_MEMORIA) {
-                // Solo tomamos la primera palabra de la línea
-                char *token = strtok(line, " \t");
-                if (token) {
-                    cpu.memoria[current_addr] = atoi(token);
-                    logger_log("[MEM] Dir %04d: %08d cargado\n", current_addr, cpu.memoria[current_addr]);
-                    current_addr++;
-                }
-            } else {
-                printf("[ERROR] Memoria llena.\n");
-                fclose(file);
-                return -1;
-            }
-        }
+    // 1. Lectura de encabezado con datos del programa
+    // lineaa 1: _start
+    if (fgets(linea, sizeof(linea), archivo)) {
+        sscanf(linea, "_start %d", pc_inicial_out);
     }
-
-    fclose(file);
     
-    // Validación de seguridad:
-    // Si el archivo no traía .NumeroPalabras, usamos lo que contamos al cargar
-    int instrucciones_reales = current_addr - direccion_carga;
-    if (*num_palabras_out == 0) {
-        *num_palabras_out = instrucciones_reales;
+    // lineaa 2: .NumeroPalabras
+    if (fgets(linea, sizeof(linea), archivo)) {
+        sscanf(linea, ".NumeroPalabras %d", num_palabras_out);
     }
 
-    return 0; // Éxito
+    // lineaa 3: .NombreProg
+    if (fgets(linea, sizeof(linea), archivo)) {
+        sscanf(linea, ".NombreProg %s", nombre_prog_out);
+    }
+
+    // 2. Lectura de instrucciones
+    while (fgets(linea, sizeof(linea), archivo)) {
+        
+        // Cortamos comentarios al final de la lineaa (si hay "0410005 // comentario")
+        char *token = strtok(linea, " \t\r\n/"); 
+        
+        if (token) {
+            // Verificamos que sea un digito (instruccion)
+            if (token[0] >= '0' && token[0] <= '9') {
+                
+                if (dirrecion_actual < TAMANO_MEMORIA) {
+                    // Convertimos a entero la instruccion
+                    int instruccion = atoi(token);
+                    
+                    cpu.memoria[dirrecion_actual] = instruccion; // Guardamos la instruccion en la memoria
+                    
+                    // Registramos en el log la carga de cada instruccion
+                    logger_log("[MEM] RAM[%04d] = %08d\n", dirrecion_actual, instruccion);
+                    
+                    dirrecion_actual++;
+                    instrucciones_cargadas++;
+                } else {
+                    printf("Error: Memoria llena (Overflow).\n");
+                    fclose(archivo);
+                    return -1;
+                }
+            }
+        }
+    }
+
+    fclose(archivo);
+    return instrucciones_cargadas;
 }
 
-// Función auxiliar para "mirar" el archivo antes de cargarlo
-int obtener_metadatos_programa(const char *filename, char *nombre_out, int *tamano_out) {
-    FILE *file = fopen(filename, "r");
-    if (!file) return -1;
-
-    char line[256];
-    *tamano_out = 0;
+// Funcion auxiliar para tomar datos del archivo antes de cargarlo
+int obtener_datos_programa(const char *nombre_archivo, char *nombre_out, int *tamano_out) {
+    FILE *archivo = fopen(nombre_archivo, "r");
+    if (!archivo) {
+        printf("Error: No se pudo abrir el archivo: %s\n", nombre_archivo);
+        return -1; // Si no se pudo abrir el archivo retorna -1
+    }
+    
+    // Valores por defecto
+    char linea[256];
+    *tamano_out = 0; // Puntero para poder "retornar" el valor
     strcpy(nombre_out, "Desconocido");
 
-    int encontrados = 0; // Para saber si encontramos ambas cosas
-
-    while (fgets(line, sizeof(line), file)) {
-        // Limpieza rapida
-        line[strcspn(line, "\r\n")] = 0;
-        
-        if (strncmp(line, ".NombreProg", 11) == 0) {
-            sscanf(line, ".NombreProg %s", nombre_out);
-            encontrados++;
-        }
-        else if (strncmp(line, ".NumeroPalabras", 15) == 0) {
-            sscanf(line, ".NumeroPalabras %d", tamano_out);
-            encontrados++;
-        }
-
-        // Si ya tenemos los datos, no necesitamos leer más
-        if (encontrados >= 2) break;
+    // Leemos lineaa 1: _start para avanzar, pero no guardamos el dato aqui
+    if (fgets(linea, sizeof(linea), archivo) == NULL) {
+        printf("Error al leer el archivo");
+        fclose(archivo);
+        return 0;
     }
 
-    fclose(file);
-    return (*tamano_out > 0) ? *tamano_out : 0; 
+    // Leemos lineaa 2: .NumeroPalabras
+    if (fgets(linea, sizeof(linea), archivo) != NULL) {
+        sscanf(linea, ".NumeroPalabras %d", tamano_out); // Extraemos solo el numero
+    }
+
+    // Leemos lineaa 3: .NombreProg
+    if (fgets(linea, sizeof(linea), archivo) != NULL) {
+        sscanf(linea, ".NombreProg %s", nombre_out); // Extraemos solo el nombre
+    }
+
+    fclose(archivo);
+
+    // Retornamos el tamaño si es valido (>0), si no, error (0)
+    return (*tamano_out > 0) ? *tamano_out : 0;
 }
